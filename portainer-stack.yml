@@ -1,0 +1,42 @@
+# Portainer Stack için hazır yapılandırma
+# Portainer → Stacks → Add Stack → Web editor'a yapıştır
+
+version: '3.8'
+
+services:
+  tesla-iptv:
+    image: node:18-alpine
+    container_name: tesla-iptv-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    # Dosyaları doğrudan GitHub'dan çek
+    command: >
+      sh -c "
+        apk add --no-cache wget &&
+        mkdir -p /app &&
+        cd /app &&
+        wget -q -O proxy-server.js 'https://raw.githubusercontent.com/KULLANICI/REPO/main/proxy-server.js' &&
+        wget -q -O index.html 'https://raw.githubusercontent.com/KULLANICI/REPO/main/index.html' &&
+        echo 'Dosyalar indirildi, sunucu başlatılıyor...' &&
+        node proxy-server.js
+      "
+    networks:
+      - tesla-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: tesla-iptv-tunnel
+    restart: unless-stopped
+    command: tunnel --url http://tesla-iptv:3000
+    depends_on:
+      - tesla-iptv
+    networks:
+      - tesla-network
+
+networks:
+  tesla-network:
+    driver: bridge

@@ -1,0 +1,160 @@
+<!-- Pi2 Dashboard'a eklenecek IPTV Server Kartı -->
+<!-- Bu kodu dashboard HTML dosyanıza ekleyin -->
+
+<!-- Yeni Bölüm: Medya ve Eğlence (varsa) veya Sistem İzleme altına -->
+<div class="section">
+    <h2><i class="icon">📺</i> Medya ve Eğlence</h2>
+    
+    <!-- IPTV Server Kartı -->
+    <a href="http://192.168.2.153:3000" target="_blank" class="card iptv-card" id="iptv-card">
+        <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                <polyline points="17 2 12 7 7 2"></polyline>
+            </svg>
+        </div>
+        <div class="card-content">
+            <h3>Tesla IPTV</h3>
+            <p class="status" id="iptv-status">Kontrol ediliyor...</p>
+            <p class="url" id="iptv-url">-</p>
+        </div>
+        <div class="status-indicator" id="iptv-indicator"></div>
+    </a>
+</div>
+
+<style>
+/* IPTV Kart Stilleri */
+.iptv-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.iptv-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    border-color: rgba(255,255,255,0.3);
+}
+
+.iptv-card .card-icon svg {
+    width: 40px;
+    height: 40px;
+    color: white;
+}
+
+.iptv-card h3 {
+    color: white;
+    margin: 0 0 5px 0;
+}
+
+.iptv-card .status {
+    color: rgba(255,255,255,0.8);
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.iptv-card .url {
+    color: rgba(255,255,255,0.6);
+    font-size: 0.75em;
+    margin: 5px 0 0 0;
+    word-break: break-all;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: #ffc107;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.online {
+    background: #28a745;
+    animation: none;
+}
+
+.status-indicator.offline {
+    background: #dc3545;
+    animation: none;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
+/* Eğer dashboard'ınızda .card sınıfı yoksa temel stiller */
+.card {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    margin-bottom: 15px;
+    background: #2d2d2d;
+}
+
+.card-icon {
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.section {
+    margin-bottom: 30px;
+}
+
+.section h2 {
+    color: #fff;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+}
+</style>
+
+<script>
+// IPTV Server Durum Kontrolü
+async function checkIPTVStatus() {
+    const statusEl = document.getElementById('iptv-status');
+    const indicatorEl = document.getElementById('iptv-indicator');
+    const urlEl = document.getElementById('iptv-url');
+    
+    try {
+        // Local adresi kontrol et
+        const response = await fetch('http://192.168.2.153:3000', {
+            method: 'HEAD',
+            mode: 'no-cors',
+            timeout: 3000
+        });
+        
+        // Eğer buraya gelindiyse sunucu çalışıyor
+        statusEl.textContent = '✅ Çevrimiçi';
+        indicatorEl.className = 'status-indicator online';
+        
+        // Son Cloudflare URL'sini göster (manuel güncelleme gerekebilir)
+        // Veya bir API'den çekilebilir
+        urlEl.textContent = 'Yerel: 192.168.2.153:3000';
+        
+    } catch (error) {
+        statusEl.textContent = '❌ Çevrimdışı';
+        indicatorEl.className = 'status-indicator offline';
+        urlEl.textContent = 'Sunucu kapalı veya erişilemiyor';
+    }
+}
+
+// Sayfa yüklenince kontrol et
+checkIPTVStatus();
+
+// Her 30 saniyede bir kontrol et
+setInterval(checkIPTVStatus, 30000);
+
+// Kart tıklandığında
+document.getElementById('iptv-card').addEventListener('click', function(e) {
+    // Eğer özel bir sayfa açmak isterseniz burada değiştirin
+    // Şu an direkt sunucuya yönlendiriyor
+});
+</script>

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  tesla-iptv:
+    build: .
+    image: tesla-iptv:latest
+    container_name: tesla-iptv-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - tesla-iptv-network
+    # Cloudflared ayrı container olarak çalışacak
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: tesla-iptv-tunnel
+    restart: unless-stopped
+    command: tunnel --url http://tesla-iptv:3000
+    depends_on:
+      - tesla-iptv
+    networks:
+      - tesla-iptv-network
+    # Loglardan URL'yi görebilirsiniz
+
+networks:
+  tesla-iptv-network:
+    driver: bridge
