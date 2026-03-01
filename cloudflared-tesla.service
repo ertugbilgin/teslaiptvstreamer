@@ -1,0 +1,39 @@
+# /etc/systemd/system/cloudflared-tesla.service
+# Tesla IPTV Cloudflare Named Tunnel Service
+# 
+# KURULUM:
+# 1. tunnel: TUNNEL_ID kısmını değiştir
+# 2. credentials-file: JSON dosya yolunu kontrol et
+# 3. sudo cp cloudflared-tesla.service /etc/systemd/system/
+# 4. sudo systemctl daemon-reload
+# 5. sudo systemctl enable --now cloudflared-tesla
+#
+# NOT: Eğer daha önce tunnel oluşturmadıysanız:
+#   cloudflared tunnel login
+#   cloudflared tunnel create tesla-iptv
+#   cloudflared tunnel route dns tesla-iptv iptv.evmcp.shop
+
+[Unit]
+Description=Cloudflare Tunnel for Tesla IPTV (evmcp.shop)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=pi
+Group=pi
+WorkingDirectory=/home/pi
+
+# Named Tunnel - Config dosyasını kullan
+ExecStart=/usr/local/bin/cloudflared tunnel run tesla-iptv
+
+Restart=always
+RestartSec=5
+KillMode=process
+
+# Hafıza limitleri (Pi 2 için)
+MemoryMax=128M
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target

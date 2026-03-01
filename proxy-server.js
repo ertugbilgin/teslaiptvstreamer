@@ -1,403 +1,313 @@
+/**
+ * Tesla IPTV Proxy Server
+ * CORS proxy for IPTV streams and HLS manifest rewriting
+ */
+
 const http = require('http');
 const https = require('https');
+const url = require('url');
 const fs = require('fs');
 const path = require('path');
-const { URL } = require('url');
-const { execSync } = require('child_process');
-
-// EPG Parser
-try {
-    var EPGParser = require('./epg-parser');
-} catch (e) {
-    // EPG modülü yoksa devam et
-    var EPGParser = null;
-}
-const epgParser = EPGParser ? new EPGParser() : null;
-const epgCache = {
-    data: null,
-    url: null,
-    timestamp: null
-};
+const xml2js = require('xml2js');
 
 const PORT = process.env.PORT || 3000;
 
-// Cloudflared URL'sini dosyadan oku
-function getCloudflareUrl() {
-    try {
-        // Dosyadan son URL'yi oku (host'daki script tarafından yazılır)
-        const urlFile = '/app/public-url.txt'; // Container içindeki path
-        if (fs.existsSync(urlFile)) {
-            const url = fs.readFileSync(urlFile, 'utf8').trim();
-            if (url && url.includes('trycloudflare.com')) {
-                return url;
-            }
-        }
-        return null;
-    } catch (e) {
-        return null;
-    }
-}
-
+// MIME types
 const MIME_TYPES = {
     '.html': 'text/html',
-    '.js': 'text/javascript',
+    '.js': 'application/javascript',
     '.css': 'text/css',
     '.json': 'application/json',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon'
+    '.ico': 'image/x-icon',
+    '.m3u': 'application/x-mpegurl',
+    '.m3u8': 'application/vnd.apple.mpegurl'
 };
 
-// URL'den içerik çek (redirect'leri takip ederek)
-function fetchUrl(targetUrl, options = {}) {
-    return new Promise((resolve, reject) => {
-        const maxRedirects = options.maxRedirects || 5;
-        let redirectCount = 0;
-
-        function doRequest(currentUrl) {
-            const parsedUrl = new URL(currentUrl);
-            const isHttps = parsedUrl.protocol === 'https:';
-            const client = isHttps ? https : http;
-
-            const requestOptions = {
-                hostname: parsedUrl.hostname,
-                port: parsedUrl.port || (isHttps ? 443 : 80),
-                path: parsedUrl.pathname + parsedUrl.search,
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': '*/*',
-                    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-                    'Referer': 'https://www.google.com/'
-                },
-                timeout: 30000,
-                rejectUnauthorized: false
-            };
-
-            const req = client.request(requestOptions, (res) => {
-                // Redirect durumları
-                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                    redirectCount++;
-                    if (redirectCount > maxRedirects) {
-                        reject(new Error('Too many redirects'));
-                        return;
-                    }
-                    
-                    const redirectUrl = new URL(res.headers.location, currentUrl).toString();
-                    console.log(`  ↪️ Redirect ${redirectCount}: ${redirectUrl.substring(0, 80)}...`);
-                    doRequest(redirectUrl);
-                    return;
-                }
-
-                // Yanıtı topla
-                let data = [];
-                res.on('data', chunk => data.push(chunk));
-                res.on('end', () => {
-                    const buffer = Buffer.concat(data);
-                    resolve({
-                        statusCode: res.statusCode,
-                        headers: res.headers,
-                        body: buffer,
-                        finalUrl: currentUrl // Final URL (redirect sonrası)
-                    });
-                });
-            });
-
-            req.on('error', (err) => reject(err));
-            req.on('timeout', () => {
-                req.destroy();
-                reject(new Error('Request timeout'));
-            });
-            req.end();
-        }
-
-        doRequest(targetUrl);
-    });
-}
-
-// HLS Manifest içindeki URL'leri proxy URL'lerine çevir
-function rewriteManifestUrls(content, baseUrl, proxyBase) {
+// Parse M3U playlist
+function parseM3U(content) {
     const lines = content.split('\n');
-    const result = [];
-    
-    for (let line of lines) {
-        line = line.trim();
+    const channels = [];
+    let currentChannel = null;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
         
-        // Boş satır veya yorum
-        if (!line || line.startsWith('#')) {
-            // EXT-X-STREAM-INF satırı (master manifest)
-            if (line.includes('URI="')) {
-                // URI içeren satır - Key veya segment map
-                line = line.replace(/URI="([^"]+)"/g, (match, uri) => {
-                    const absoluteUrl = new URL(uri, baseUrl).toString();
-                    const proxyUrl = `${proxyBase}/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
-                    return `URI="${proxyUrl}"`;
-                });
-            }
-            result.push(line);
-            continue;
-        }
-        
-        // URL satırı (relative veya absolute)
-        let absoluteUrl;
-        try {
-            // Eğer zaten absolute URL ise
-            if (line.startsWith('http://') || line.startsWith('https://')) {
-                absoluteUrl = line;
-            } else {
-                // Relative URL - baseUrl ile birleştir
-                absoluteUrl = new URL(line, baseUrl).toString();
-            }
+        if (trimmed.startsWith('#EXTINF:')) {
+            const nameMatch = trimmed.match(/tvg-name="([^"]+)"/);
+            const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/);
+            const idMatch = trimmed.match(/tvg-id="([^"]+)"/);
             
-            // Proxy URL'sine çevir
-            const proxyUrl = `${proxyBase}/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
-            result.push(proxyUrl);
-        } catch (e) {
-            // URL değilse olduğu gibi bırak
-            result.push(line);
+            let name = trimmed.split(',').pop() || 'Unknown';
+            if (nameMatch) name = nameMatch[1];
+            
+            currentChannel = {
+                id: idMatch ? idMatch[1] : name,
+                name: name,
+                logo: logoMatch ? logoMatch[1] : null,
+                url: null
+            };
+        } else if (trimmed && !trimmed.startsWith('#') && currentChannel) {
+            currentChannel.url = trimmed;
+            channels.push(currentChannel);
+            currentChannel = null;
         }
     }
-    
-    return result.join('\n');
+
+    return channels;
 }
 
-const server = http.createServer(async (req, res) => {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+// Parse EPG XML
+async function parseEPG(xmlContent) {
+    const parser = new xml2js.Parser({ explicitArray: false });
     
+    try {
+        const result = await parser.parseStringPromise(xmlContent);
+        const programmes = result.tv.programme;
+        const epgData = {};
+
+        programmes.forEach(prog => {
+            const channelId = prog.$.channel;
+            if (!epgData[channelId]) {
+                epgData[channelId] = [];
+            }
+            
+            epgData[channelId].push({
+                title: prog.title ? prog.title._ || prog.title : 'Bilinmeyen',
+                start: parseXMLTVDate(prog.$.start),
+                stop: parseXMLTVDate(prog.$.stop),
+                desc: prog.desc ? prog.desc._ || prog.desc : ''
+            });
+        });
+
+        return epgData;
+    } catch (e) {
+        console.error('EPG parse error:', e);
+        return {};
+    }
+}
+
+// Parse XMLTV date format
+function parseXMLTVDate(dateStr) {
+    // XMLTV format: 20240101120000 +0200
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6) - 1;
+    const day = dateStr.substring(6, 8);
+    const hour = dateStr.substring(8, 10);
+    const minute = dateStr.substring(10, 12);
+    
+    return new Date(year, month, day, hour, minute);
+}
+
+// Proxy request
+function proxyRequest(targetUrl, res, rewriteUrls = false) {
+    const parsed = url.parse(targetUrl);
+    const protocol = parsed.protocol === 'https:' ? https : http;
+
+    const options = {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+        path: parsed.path,
+        method: 'GET',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0',
+            'Accept': '*/*',
+            'Accept-Encoding': 'identity',
+            'Connection': 'keep-alive'
+        },
+        timeout: 10000,
+        rejectUnauthorized: false
+    };
+
+    const proxyReq = protocol.request(options, (proxyRes) => {
+        // CORS headers
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', '*');
+        
+        // Content-Type
+        const contentType = proxyRes.headers['content-type'] || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+
+        if (rewriteUrls && contentType.includes('mpegurl')) {
+            // Rewrite HLS manifest URLs
+            let body = '';
+            proxyRes.setEncoding('utf8');
+            proxyRes.on('data', chunk => body += chunk);
+            proxyRes.on('end', () => {
+                const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+                const rewritten = body.replace(/^([^#].*\.m3u8?)$/gm, (match) => {
+                    const absoluteUrl = match.startsWith('http') ? match : baseUrl + match;
+                    return `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
+                });
+                res.end(rewritten);
+            });
+        } else {
+            res.writeHead(proxyRes.statusCode);
+            proxyRes.pipe(res);
+        }
+    });
+
+    proxyReq.on('error', (err) => {
+        console.error('Proxy error:', err.message);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: err.message }));
+    });
+
+    proxyReq.on('timeout', () => {
+        proxyReq.destroy();
+        res.statusCode = 504;
+        res.end(JSON.stringify({ error: 'Gateway timeout' }));
+    });
+
+    proxyReq.end();
+}
+
+// Create server
+const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    const pathname = parsedUrl.pathname;
+
+    // Enable CORS for all responses
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+
+    // Handle preflight
     if (req.method === 'OPTIONS') {
-        res.writeHead(200);
+        res.statusCode = 200;
         res.end();
         return;
     }
 
-    // Cloudflare veya diğer reverse proxy arkasındaysak HTTPS kullan
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const url = new URL(req.url, `${protocol}://${host}`);
-    const pathname = url.pathname;
-    const proxyBase = `${protocol}://${host}`;
-
-    console.log(`\n[${new Date().toLocaleTimeString()}] ${req.method} ${pathname}`);
-
-    // Cloudflare URL endpoint
-    if (pathname === '/cloudflare-url') {
-        const cfUrl = getCloudflareUrl();
-        res.writeHead(200, { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        });
-        res.end(JSON.stringify({ 
-            url: cfUrl,
-            timestamp: new Date().toISOString()
-        }));
-        return;
-    }
-
-    // EPG endpoint
-    if (pathname === '/epg' && epgParser) {
-        const channelId = url.searchParams.get('channel');
-        
-        if (channelId) {
-            // Belirli kanalın EPG'si
-            const current = epgParser.getCurrentProgram(channelId);
-            const next = epgParser.getNextProgram(channelId);
-            
-            res.writeHead(200, { 
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            });
-            res.end(JSON.stringify({ 
-                channel: channelId,
-                current: current,
-                next: next
-            }));
-        } else {
-            // Tüm EPG verileri
-            res.writeHead(200, { 
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            });
-            res.end(JSON.stringify({ 
-                data: epgParser.getAllData(),
-                lastFetch: epgParser.lastFetch
-            }));
-        }
-        return;
-    }
-
-    // EPG yükleme endpoint'i
-    if (pathname === '/epg-load' && epgParser) {
-        const epgUrl = url.searchParams.get('url');
-        if (!epgUrl) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'EPG URL gerekli' }));
-            return;
-        }
-
-        try {
-            await epgParser.fetchEPG(epgUrl);
-            epgCache.data = epgParser.getAllData();
-            epgCache.url = epgUrl;
-            epgCache.timestamp = new Date();
-            
-            res.writeHead(200, { 
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            });
-            res.end(JSON.stringify({ 
-                success: true,
-                message: 'EPG yüklendi',
-                channels: Object.keys(epgCache.data).length
-            }));
-        } catch (error) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
-                error: 'EPG yüklenemedi',
-                message: error.message
-            }));
-        }
-        return;
-    }
-
-    // Kısa URL yönlendirmesi /t
-    if (pathname === '/t' || pathname === '/t/') {
-        const cfUrl = getCloudflareUrl();
-        if (cfUrl) {
-            res.writeHead(302, { 'Location': cfUrl });
-            res.end();
-        } else {
-            res.writeHead(404, { 'Content-Type': 'text/html' });
-            res.end('<h1>URL bulunamadı</h1><p>Cloudflare tunnel aktif değil.</p>');
-        }
-        return;
-    }
-
-    // Proxy endpoint: M3U dosyaları ve HLS manifestleri
-    if (pathname === '/proxy' || pathname === '/stream-proxy') {
-        const targetUrl = url.searchParams.get('url');
+    // Routes
+    if (pathname === '/proxy') {
+        // General proxy endpoint
+        const targetUrl = parsedUrl.query.url;
         if (!targetUrl) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'URL parametresi gerekli' }));
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'URL parameter required' }));
+            return;
+        }
+        proxyRequest(targetUrl, res);
+
+    } else if (pathname === '/stream-proxy') {
+        // Stream proxy with HLS manifest rewriting
+        const targetUrl = parsedUrl.query.url;
+        if (!targetUrl) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'URL parameter required' }));
+            return;
+        }
+        proxyRequest(targetUrl, res, true);
+
+    } else if (pathname === '/epg') {
+        // EPG proxy and parse
+        const epgUrl = parsedUrl.query.url;
+        if (!epgUrl) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'URL parameter required' }));
             return;
         }
 
-        console.log(`  🎯 Hedef: ${targetUrl.substring(0, 100)}`);
+        const parsed = url.parse(epgUrl);
+        const protocol = parsed.protocol === 'https:' ? https : http;
 
-        try {
-            const result = await fetchUrl(targetUrl);
-            
-            console.log(`  ✅ Status: ${result.statusCode}`);
-            console.log(`  📦 Content-Type: ${result.headers['content-type'] || 'unknown'}`);
-            
-            // İçerik tipini belirle
-            let contentType = result.headers['content-type'] || 'application/octet-stream';
-            const isTextContent = contentType.includes('text') || 
-                                  contentType.includes('application/vnd.apple.mpegurl') ||
-                                  contentType.includes('audio/mpegurl');
-            
-            // M3U8/M3U dosyası mı kontrol et
-            const isM3U = targetUrl.includes('.m3u') || 
-                          (isTextContent && result.body.toString('utf8', 0, 100).includes('#EXTM3U'));
-            
-            if (isM3U && isTextContent) {
-                console.log(`  🎬 HLS Manifest tespit edildi - URL'leri rewrite ediliyor`);
-                
-                // Manifest içeriğini al
-                let manifestContent = result.body.toString('utf8');
-                
-                // URL'leri rewrite et
-                const baseUrl = result.finalUrl || targetUrl;
-                manifestContent = rewriteManifestUrls(manifestContent, baseUrl, proxyBase);
-                
-                const rewrittenBuffer = Buffer.from(manifestContent, 'utf8');
-                
-                res.writeHead(result.statusCode, {
-                    'Content-Type': 'application/vnd.apple.mpegurl',
-                    'Content-Length': rewrittenBuffer.length,
-                    'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'no-cache'
-                });
-                res.end(rewrittenBuffer);
-                
-                console.log(`  ✏️  Manifest rewrite edildi (${rewrittenBuffer.length} bytes)`);
-            } else {
-                // Binary içerik (TS segment, vb.)
-                res.writeHead(result.statusCode, {
-                    'Content-Type': contentType,
-                    'Content-Length': result.body.length,
-                    'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=3600'
-                });
-                res.end(result.body);
-            }
+        const options = {
+            hostname: parsed.hostname,
+            port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+            path: parsed.path,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0'
+            },
+            timeout: 15000
+        };
 
-        } catch (error) {
-            console.error(`  ❌ Hata: ${error.message}`);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
-                error: 'Proxy hatası', 
-                message: error.message,
-                url: targetUrl 
-            }));
-        }
-        return;
-    }
-
-    // Statik dosya servisi
-    let filePath = pathname === '/' ? '/index.html' : pathname;
-    filePath = path.join(__dirname, filePath);
-
-    const extname = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[extname] || 'application/octet-stream';
-
-    fs.readFile(filePath, (err, content) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                res.writeHead(204);
-                res.end();
-            } else {
-                res.writeHead(500);
-                res.end('Sunucu hatası');
-            }
-        } else {
-            res.writeHead(200, { 
-                'Content-Type': contentType,
-                'Access-Control-Allow-Origin': '*'
+        const epgReq = protocol.request(options, async (epgRes) => {
+            let xmlData = '';
+            epgRes.setEncoding('utf8');
+            epgRes.on('data', chunk => xmlData += chunk);
+            epgRes.on('end', async () => {
+                try {
+                    const epgData = await parseEPG(xmlData);
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(epgData));
+                } catch (e) {
+                    res.statusCode = 500;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: 'EPG parse failed' }));
+                }
             });
-            res.end(content, 'utf-8');
-        }
-    });
+        });
+
+        epgReq.on('error', (err) => {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: err.message }));
+        });
+
+        epgReq.on('timeout', () => {
+            epgReq.destroy();
+            res.statusCode = 504;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'EPG fetch timeout' }));
+        });
+
+        epgReq.end();
+
+    } else if (pathname === '/parse-m3u') {
+        // Parse M3U endpoint
+        let body = '';
+        req.setEncoding('utf8');
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const channels = parseM3U(body);
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(channels));
+            } catch (e) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+
+    } else if (pathname === '/' || pathname === '/index.html') {
+        // Serve main HTML file
+        const filePath = path.join(__dirname, 'index.html');
+        fs.readFile(filePath, 'utf8', (err, data) => {
+            if (err) {
+                res.statusCode = 500;
+                res.end('Error loading index.html');
+                return;
+            }
+            res.setHeader('Content-Type', 'text/html');
+            res.end(data);
+        });
+
+    } else {
+        // Static files
+        const filePath = path.join(__dirname, pathname);
+        const ext = path.extname(filePath).toLowerCase();
+        
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.statusCode = 404;
+                res.end('Not found');
+                return;
+            }
+            res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
+            res.end(data);
+        });
+    }
 });
 
 server.listen(PORT, () => {
-    console.log('╔════════════════════════════════════════════════╗');
-    console.log('║    🚗 Tesla IPTV Proxy Server Başladı!         ║');
-    console.log('╠════════════════════════════════════════════════╣');
-    
-    const { networkInterfaces } = require('os');
-    const nets = networkInterfaces();
-    
-    for (const name of Object.keys(nets)) {
-        for (const net of nets[name]) {
-            if (net.family === 'IPv4' && !net.internal) {
-                console.log(`║  🌐 http://${net.address}:${PORT}                    `);
-            }
-        }
-    }
-    
-    console.log(`║  💻 http://localhost:${PORT}                      `);
-    console.log('╚════════════════════════════════════════════════╝');
-    console.log('');
-    console.log('Özellikler:');
-    console.log('  • /proxy?url=...  - M3U dosyaları (rewrite yok)');
-    console.log('  • /stream-proxy?url=... - HLS manifestleri (URL rewrite)');
-    console.log('  • Otomatik redirect takibi');
-    console.log('  • Manifest URL rewrite (relative → absolute → proxy)');
-    console.log('');
+    console.log(`🚗 Tesla IPTV Server running on port ${PORT}`);
+    console.log(`🌐 Domain: https://iptv.evmcp.shop`);
 });

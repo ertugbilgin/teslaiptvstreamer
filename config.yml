@@ -1,0 +1,31 @@
+# Cloudflare Tunnel Config
+# Yer: ~/.cloudflared/config.yml (Pi'de)
+#
+# KURULUM ADIMLARI:
+# 1. TUNNEL_ID'yi değiştir (cloudflared tunnel list ile al)
+# 2. credentials-file yolunu kontrol et
+# 3. Bu dosyayı Pi'de ~/.cloudflared/config.yml olarak kaydet
+#
+# SONRA:
+#   cloudflared tunnel route dns tesla-iptv iptv.evmcp.shop
+
+# TUNNEL ID - KENDİ ID'NİZİ YAZIN
+tunnel: BURAYA_TUNNEL_ID_YAZIN
+
+# Credentials dosyası (otomatiktir)
+credentials-file: /home/pi/.cloudflared/BURAYA_TUNNEL_ID_YAZIN.json
+
+# Giriş kuralları
+ingress:
+  # Ana domain - IPTV uygulaması
+  - hostname: iptv.evmcp.shop
+    service: http://localhost:3000
+    originRequest:
+      noTLSVerify: false
+  
+  # Tüm diğer istekler - 404
+  - service: http_status:404
+
+# Warp/Warp+routing (gerekirse)
+# warp-routing:
+#   enabled: true

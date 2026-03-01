@@ -1,0 +1,26 @@
+# Homer Dashboard - IPTV Kartı Ekleme
+# 
+# Kalıcı domain ile kullanım:
+# 1. Homer config.yml dosyanıza bu kartı ekleyin
+# 2. http://192.168.2.153:8080 adresinden dashboard'a erişin
+
+services:
+  - name: "IPTV"
+    icon: "fas fa-tv"
+    subtitle: "Tesla IPTV Streamer"
+    tag: "media"
+    keywords: ["iptv", "tv", "stream", "tesla"]
+    url: "https://iptv.evmcp.shop"  # Kalıcı domain!
+    target: "_blank"
+    method: "get"
+    # Opsiyonel: healthcheck için local IP
+    # ping: "http://192.168.2.153:3000"
+    
+  # Diğer servisleriniz...
+  # - name: "Portainer"
+  #   icon: "fab fa-docker"
+  #   url: "http://192.168.2.153:9000"
+  #   ...
+
+# Not: Homer config.yml'de services bölümüne ekleyin
+# Örnek konum: /opt/homer/assets/config.yml

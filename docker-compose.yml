@@ -1,31 +1,38 @@
+# Tesla IPTV Streamer - Portainer Stack
+# 
+# KALICI DOMAIN: https://iptv.evmcp.shop
+# 
+# Kurulum:
+# 1. Bu dosyayı Portainer'de stack olarak kullanın
+# 2. Cloudflared tunnel host'da çalışıyor olmalı
+# 3. IPTV uygulamasına https://iptv.evmcp.shop adresinden erişin
+
 version: '3.8'
 
 services:
   tesla-iptv:
-    build: .
-    image: tesla-iptv:latest
-    container_name: tesla-iptv-server
-    restart: unless-stopped
+    image: node:18-alpine
+    container_name: tesla-iptv
+    working_dir: /app
+    
     ports:
       - "3000:3000"
+    
+    volumes:
+      - /opt/tesla-iptv:/app
+    
+    # Host network - ARMv7 uyumluluğu için
+    network_mode: host
+    
+    command: >
+      sh -c "npm install xml2js && node proxy-server.js"
+    
     environment:
       - NODE_ENV=production
       - PORT=3000
-    networks:
-      - tesla-iptv-network
-    # Cloudflared ayrı container olarak çalışacak
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: tesla-iptv-tunnel
+    
     restart: unless-stopped
-    command: tunnel --url http://tesla-iptv:3000
-    depends_on:
-      - tesla-iptv
-    networks:
-      - tesla-iptv-network
-    # Loglardan URL'yi görebilirsiniz
-
-networks:
-  tesla-iptv-network:
-    driver: bridge
+    
+    labels:
+      - "app=tesla-iptv"
+      - "domain=iptv.evmcp.shop"
