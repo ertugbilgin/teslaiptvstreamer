@@ -21,18 +21,19 @@
         .player-btn { background: #333; border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
         .player-btn:hover { background: #444; }
         .player-btn.active { background: #ff4444; }
-        .setup-section { background: #1a1a1a; padding: 20px; border-radius: 16px; margin-bottom: 15px; }
+        .setup-section { background: #1a1a1a; padding: 20px; border-radius: 16px; margin-bottom: 15px; display: none; }
         .input-group { margin-bottom: 12px; }
         .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
         .input-group input { width: 100%; padding: 14px; border: 1px solid #333; border-radius: 10px; background: #252525; color: #fff; font-size: 15px; }
         .btn { width: 100%; padding: 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .btn-primary { background: linear-gradient(135deg, #00d4ff 0%, #7b2cbf 100%); color: #fff; }
+        .btn-secondary { background: #333; color: #fff; margin-top: 10px; }
         .filters { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
         .filter-btn { padding: 10px 18px; border: 1px solid #333; border-radius: 20px; background: #1a1a1a; color: #888; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .filter-btn:hover, .filter-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
         .search-box { margin-bottom: 15px; }
         .search-box input { width: 100%; padding: 14px 20px; border: 1px solid #333; border-radius: 10px; background: #1a1a1a; color: #fff; font-size: 15px; }
-        .channels-section { background: #1a1a1a; padding: 20px; border-radius: 16px; }
+        .channels-section { background: #1a1a1a; padding: 20px; border-radius: 16px; display: none; }
         .channels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
         .channel-card { background: #252525; border-radius: 12px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; text-align: center; border: 2px solid transparent; }
         .channel-card:hover { transform: translateY(-3px); border-color: #00d4ff; background: #2a2a2a; }
@@ -43,6 +44,7 @@
         .loading.active { display: block; }
         .spinner { width: 50px; height: 50px; border: 3px solid #333; border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .auto-load-msg { background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center; color: #00d4ff; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -59,30 +61,238 @@
                 <button class="player-btn" id="favBtn" onclick="toggleCurrentFavorite()"><span id="favIcon">🤍</span> Favori</button>
             </div>
         </div>
-        <div class="setup-section" id="setupSection">
-            <div class="input-group"><label>🔗 M3U Playlist URL</label><input type="text" id="m3uUrl" placeholder="https://ornek.com/playlist.m3u"></div>
-            <div class="input-group"><label>📋 Veya M3U Dosya İçeriği</label><input type="file" id="m3uFile" accept=".m3u,.m3u8" style="padding: 10px;"></div>
-            <button class="btn btn-primary" onclick="loadPlaylist()">📺 Kanalları Yükle</button>
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">Türkiye kanal listesi yükleniyor...</p>
         </div>
-        <div class="loading" id="loading"><div class="spinner"></div><p>Kanallar yükleniyor...</p></div>
-        <div class="channels-section" id="channelsSection" style="display: none;">
-            <div class="filters">
-                <button class="filter-btn active" onclick="filterChannels('all')">Tümü</button>
-                <button class="filter-btn" onclick="filterChannels('favorites')">❤️ Favoriler</button>
-                <button class="filter-btn" onclick="filterChannels('recent')">🕐 Son İzlenen</button>
+        <div class="setup-section" id="setupSection">
+            <div class="auto-load-msg">🇹🇷 Varsayılan: Türkiye kanal listesi otomatik yüklenir</div>
+            <div class="input-group">
+                <label>🔗 Başka M3U Playlist URL (Opsiyonel)</label>
+                <input type="text" id="m3uUrl" placeholder="https://ornek.com/playlist.m3u">
+            </div>
+            <div class="input-group">
+                <label>📋 Veya M3U Dosya Seç</label>
+                <input type="file" id="m3uFile" accept=".m3u,.m3u8" style="padding: 10px;">
+            </div>
+            <button class="btn btn-primary" onclick="loadCustomPlaylist()">📺 Yükle</button>
+            <button class="btn btn-secondary" onclick="loadDefaultPlaylist()">🔄 Varsayılan Türkiye Listesine Dön</button>
+        </div>
+        <div class="channels-section" id="channelsSection">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="filters">
+                    <button class="filter-btn active" onclick="filterChannels('all')">Tümü</button>
+                    <button class="filter-btn" onclick="filterChannels('favorites')">❤️ Favoriler</button>
+                    <button class="filter-btn" onclick="filterChannels('recent')">🕐 Son İzlenen</button>
+                </div>
+                <button class="btn btn-secondary" style="width: auto; padding: 10px 20px; font-size: 12px; margin: 0;" onclick="showSetup()">⚙️ Başka Liste</button>
             </div>
             <div class="search-box"><input type="text" id="searchInput" placeholder="🔍 Kanal ara..." oninput="searchChannels()"></div>
             <div class="channels-grid" id="channelsGrid"></div>
         </div>
     </div>
     <script>
-        let channels=[], favorites=JSON.parse(localStorage.getItem('favorites')||'[]'), recentChannels=JSON.parse(localStorage.getItem('recentChannels')||'[]'), currentFilter='all', currentChannel=null, hls=null;
-        async function loadPlaylist(){const e=document.getElementById("m3uUrl"),t=document.getElementById("m3uFile"),n=document.getElementById("loading"),l=document.getElementById("setupSection"),a=document.getElementById("channelsSection");let d="";if(n.classList.add("active"),l.style.display="none",t.files.length>0)d=await t.files[0].text();else{if(!e.value.trim())throw new Error("Lütfen M3U URL veya dosya girin");{const t=await fetch("/proxy?url="+encodeURIComponent(e.value.trim()));d=await t.text()}}channels=function(e){const t=e.split("\n"),n=[];let l=null;for(const e of t){const t=e.trim();if(t.startsWith("#EXTINF:")){const e=t.match(/tvg-name="([^"]+)"/),n=t.match(/tvg-logo="([^"]+)"/),a=t.match(/tvg-id="([^"]+)"/);let d=t.split(",").pop()||"Bilinmeyen Kanal";e&&(d=e[1]),l={id:a?a[1]:d,name:d,logo:n?n[1]:null,url:null}}else t&&!t.startsWith("#")&&l&&(l.url=t,n.push(l),l=null)}return n}(d),n.classList.remove("active"),a.style.display="block",renderChannels()}
-        function renderChannels(){const e=document.getElementById("channelsGrid"),t=document.getElementById("searchInput").value.toLowerCase();let n=channels;"favorites"===currentFilter?n=channels.filter((e=>favorites.includes(e.name))):"recent"===currentFilter&&(n=recentChannels.map((e=>channels.find((t=>t.name===e)))).filter(Boolean)),t&&(n=n.filter((e=>e.name.toLowerCase().includes(t)))),e.innerHTML=n.length?n.map((e=>{const t=favorites.includes(e.name),n=currentChannel===e.name;return`<div class="channel-card ${n?"active":""}" onclick="playChannel('${e.name}')">${e.logo?`<img src="${e.logo}" class="channel-logo" alt="" onerror="this.style.display='none'">`:""}<div class="channel-name">${e.name}</div></div>`})).join(""):'<div style="text-align:center;padding:40px;color:#666;"><div style="font-size:48px;margin-bottom:15px;opacity:0.5;">📺</div><p>Kanal bulunamadı</p></div>'}
-        async function playChannel(e){const t=channels.find((t=>t.name===e));if(t){if(currentChannel=e,document.getElementById("videoContainer").style.display="block",document.getElementById("playerHeader").style.display="flex",document.getElementById("currentChannelName").textContent=t.name,function(){const e=document.getElementById("favBtn"),t=document.getElementById("favIcon");favorites.includes(currentChannel)?(e.classList.add("active"),t.textContent="❤️"):(e.classList.remove("active"),t.textContent="🤍")}(),renderChannels(),recentChannels=recentChannels.filter((t=>t!==e)),recentChannels.unshift(e),recentChannels.length>10&&(recentChannels=recentChannels.slice(0,10)),localStorage.setItem("recentChannels",JSON.stringify(recentChannels)),hls&&(hls.destroy(),hls=null),t.url.includes(".m3u8")||t.url.includes("hls"))if(Hls.isSupported()){hls=new Hls({maxBufferLength:30,maxMaxBufferLength:60,enableWorker:!0});const e="/stream-proxy?url="+encodeURIComponent(t.url);hls.loadSource(e),hls.attachMedia(document.getElementById("video")),hls.on(Hls.Events.MANIFEST_PARSED,(()=>{document.getElementById("video").play().catch((()=>{}))}))}else document.getElementById("video").src=t.url,document.getElementById("video").play().catch((()=>{}));else document.getElementById("video").src=t.url,document.getElementById("video").play().catch((()=>{}));document.getElementById("videoContainer").scrollIntoView({behavior:"smooth"})}}
-        function toggleCurrentFavorite(){if(currentChannel){const e=favorites.indexOf(currentChannel);e>-1?favorites.splice(e,1):favorites.push(currentChannel),localStorage.setItem("favorites",JSON.stringify(favorites)),function(){const e=document.getElementById("favBtn"),t=document.getElementById("favIcon");favorites.includes(currentChannel)?(e.classList.add("active"),t.textContent="❤️"):(e.classList.remove("active"),t.textContent="🤍")}(),renderChannels()}}
-        function filterChannels(e){currentFilter=e,document.querySelectorAll(".filter-btn").forEach((t=>{t.classList.remove("active"),(t.textContent.toLowerCase().includes("tümü")&&"all"===e||t.textContent.toLowerCase().includes("favori")&&"favorites"===e||t.textContent.toLowerCase().includes("son")&&"recent"===e)&&t.classList.add("active")})),renderChannels()}
-        function searchChannels(){renderChannels()}
+        const DEFAULT_M3U_URL = 'https://streams.uzunmuhalefet.com/lists/tr.m3u';
+        const DEFAULT_EPG_URL = 'https://streams.uzunmuhalefet.com/epg/tr.xml';
+        let channels=[], favorites=JSON.parse(localStorage.getItem('favorites')||'[]'), recentChannels=JSON.parse(localStorage.getItem('recentChannels')||'[]'), currentFilter='all', currentChannel=null, hls=null, epgData=null;
+        
+        // Sayfa yüklenince otomatik başlat
+        window.onload = function() {
+            loadDefaultPlaylist();
+        };
+        
+        async function loadDefaultPlaylist() {
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('channelsSection').style.display = 'none';
+            document.getElementById('loadingText').textContent = '🇹🇷 Türkiye kanal listesi yükleniyor...';
+            
+            try {
+                const response = await fetch('/proxy?url=' + encodeURIComponent(DEFAULT_M3U_URL));
+                const m3uContent = await response.text();
+                channels = parseM3U(m3uContent);
+                
+                // EPG'yi de yükle (arka planda)
+                loadEPG(DEFAULT_EPG_URL);
+                
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('channelsSection').style.display = 'block';
+                renderChannels();
+            } catch (error) {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('setupSection').style.display = 'block';
+                alert('Varsayılan liste yüklenemedi. Lütfen başka bir liste yükleyin.');
+            }
+        }
+        
+        async function loadCustomPlaylist() {
+            const urlInput = document.getElementById('m3uUrl');
+            const fileInput = document.getElementById('m3uFile');
+            
+            if (!urlInput.value.trim() && fileInput.files.length === 0) {
+                alert('Lütfen URL girin veya dosya seçin');
+                return;
+            }
+            
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('loadingText').textContent = 'Kanallar yükleniyor...';
+            
+            try {
+                let m3uContent = '';
+                if (fileInput.files.length > 0) {
+                    m3uContent = await fileInput.files[0].text();
+                } else {
+                    const response = await fetch('/proxy?url=' + encodeURIComponent(urlInput.value.trim()));
+                    m3uContent = await response.text();
+                }
+                
+                channels = parseM3U(m3uContent);
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('channelsSection').style.display = 'block';
+                renderChannels();
+            } catch (error) {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('setupSection').style.display = 'block';
+                alert('Hata: ' + error.message);
+            }
+        }
+        
+        function showSetup() {
+            document.getElementById('setupSection').style.display = 'block';
+            document.getElementById('channelsSection').style.display = 'none';
+        }
+        
+        async function loadEPG(url) {
+            try {
+                const response = await fetch('/epg?url=' + encodeURIComponent(url));
+                epgData = await response.json();
+                renderChannels();
+            } catch (e) {
+                console.error('EPG yüklenemedi:', e);
+            }
+        }
+        
+        function parseM3U(content) {
+            const lines = content.split('\n'), channels = [];
+            let currentChannel = null;
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('#EXTINF:')) {
+                    const nameMatch = trimmed.match(/tvg-name="([^"]+)"/);
+                    const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/);
+                    const idMatch = trimmed.match(/tvg-id="([^"]+)"/);
+                    let name = trimmed.split(',').pop() || 'Bilinmeyen Kanal';
+                    if (nameMatch) name = nameMatch[1];
+                    currentChannel = { id: idMatch ? idMatch[1] : name, name: name, logo: logoMatch ? logoMatch[1] : null, url: null };
+                } else if (trimmed && !trimmed.startsWith('#') && currentChannel) {
+                    currentChannel.url = trimmed;
+                    channels.push(currentChannel);
+                    currentChannel = null;
+                }
+            }
+            return channels;
+        }
+        
+        function renderChannels() {
+            const grid = document.getElementById('channelsGrid');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            let filteredChannels = channels;
+            
+            if (currentFilter === 'favorites') {
+                filteredChannels = channels.filter(ch => favorites.includes(ch.name));
+            } else if (currentFilter === 'recent') {
+                filteredChannels = recentChannels.map(name => channels.find(ch => ch.name === name)).filter(Boolean);
+            }
+            
+            if (searchTerm) {
+                filteredChannels = filteredChannels.filter(ch => ch.name.toLowerCase().includes(searchTerm));
+            }
+            
+            if (filteredChannels.length === 0) {
+                grid.innerHTML = '<div style="text-align:center;padding:40px;color:#666;"><div style="font-size:48px;margin-bottom:15px;opacity:0.5;">📺</div><p>Kanal bulunamadı</p></div>';
+                return;
+            }
+            
+            grid.innerHTML = filteredChannels.map(channel => {
+                const isFav = favorites.includes(channel.name);
+                const isActive = currentChannel === channel.name;
+                return `<div class="channel-card ${isActive ? 'active' : ''}" onclick="playChannel('${channel.name}')">${channel.logo ? `<img src="${channel.logo}" class="channel-logo" alt="" onerror="this.style.display='none'">` : ''}<div class="channel-name">${channel.name}</div></div>`;
+            }).join('');
+        }
+        
+        async function playChannel(channelName) {
+            const channel = channels.find(ch => ch.name === channelName);
+            if (!channel) return;
+            
+            currentChannel = channelName;
+            document.getElementById('videoContainer').style.display = 'block';
+            document.getElementById('playerHeader').style.display = 'flex';
+            document.getElementById('currentChannelName').textContent = channel.name;
+            updateFavButton();
+            renderChannels();
+            
+            recentChannels = recentChannels.filter(name => name !== channelName);
+            recentChannels.unshift(channelName);
+            if (recentChannels.length > 10) recentChannels = recentChannels.slice(0, 10);
+            localStorage.setItem('recentChannels', JSON.stringify(recentChannels));
+            
+            if (hls) { hls.destroy(); hls = null; }
+            const video = document.getElementById('video');
+            
+            if (channel.url.includes('.m3u8') || channel.url.includes('hls')) {
+                if (Hls.isSupported()) {
+                    hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60, enableWorker: true });
+                    hls.loadSource('/stream-proxy?url=' + encodeURIComponent(channel.url));
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+                } else {
+                    video.src = channel.url;
+                    video.play().catch(() => {});
+                }
+            } else {
+                video.src = channel.url;
+                video.play().catch(() => {});
+            }
+            document.getElementById('videoContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function toggleCurrentFavorite() {
+            if (!currentChannel) return;
+            const idx = favorites.indexOf(currentChannel);
+            if (idx > -1) favorites.splice(idx, 1);
+            else favorites.push(currentChannel);
+            localStorage.setItem('favorites', JSON.stringify(favorites));
+            updateFavButton();
+            renderChannels();
+        }
+        
+        function updateFavButton() {
+            const btn = document.getElementById('favBtn');
+            const icon = document.getElementById('favIcon');
+            if (favorites.includes(currentChannel)) {
+                btn.classList.add('active');
+                icon.textContent = '❤️';
+            } else {
+                btn.classList.remove('active');
+                icon.textContent = '🤍';
+            }
+        }
+        
+        function filterChannels(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if ((filter === 'all' && btn.textContent.includes('Tümü')) ||
+                    (filter === 'favorites' && btn.textContent.includes('Favori')) ||
+                    (filter === 'recent' && btn.textContent.includes('Son'))) {
+                    btn.classList.add('active');
+                }
+            });
+            renderChannels();
+        }
+        
+        function searchChannels() { renderChannels(); }
     </script>
 </body>
 </html>
