@@ -156,13 +156,19 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
         res.setHeader('Content-Type', contentType);
 
         if (rewriteUrls && contentType.includes('mpegurl')) {
-            // Rewrite HLS manifest URLs
+            // Rewrite HLS manifest URLs - both .m3u8 and .ts files
             let body = '';
             proxyRes.setEncoding('utf8');
             proxyRes.on('data', chunk => body += chunk);
             proxyRes.on('end', () => {
                 const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
-                const rewritten = body.replace(/^([^#].*\.m3u8?)$/gm, (match) => {
+                // Rewrite all non-comment lines (URLs) to go through proxy
+                const rewritten = body.replace(/^([^#\s].+)$/gm, (match) => {
+                    // Skip if already a proxy URL
+                    if (match.startsWith('/stream-proxy') || match.startsWith('/proxy')) {
+                        return match;
+                    }
+                    // Make absolute URL if relative
                     const absoluteUrl = match.startsWith('http') ? match : baseUrl + match;
                     return `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
                 });
