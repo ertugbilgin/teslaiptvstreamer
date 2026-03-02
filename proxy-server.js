@@ -338,3 +338,4 @@ server.listen(PORT, () => {
     console.log(`🚗 Tesla IPTV Server running on port ${PORT}`);
     console.log(`🌐 Domain: https://iptv.evmcp.shop`);
 });
+// Deploy timestamp: Mon Mar  2 12:09:49 CET 2026
