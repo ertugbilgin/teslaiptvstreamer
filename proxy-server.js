@@ -125,11 +125,15 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive'
         },
-        timeout: 10000,
+        timeout: 30000,
         rejectUnauthorized: false
     };
 
+    console.log(`Proxy request: ${targetUrl} (redirectCount: ${redirectCount})`);
+    
     const proxyReq = protocol.request(options, (proxyRes) => {
+        console.log(`Proxy response: ${targetUrl} - Status: ${proxyRes.statusCode}`);
+        
         // Handle redirects (301, 302, 307, 308)
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
             let redirectUrl = proxyRes.headers.location;
