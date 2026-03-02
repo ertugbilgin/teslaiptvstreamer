@@ -125,7 +125,7 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive'
         },
-        timeout: 10000,
+        timeout: 30000,
         rejectUnauthorized: false
     };
 
@@ -157,10 +157,10 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
 
         if (rewriteUrls && contentType.includes('mpegurl')) {
             // Rewrite HLS manifest URLs - both .m3u8 and .ts files
-            let body = '';
-            proxyRes.setEncoding('utf8');
-            proxyRes.on('data', chunk => body += chunk);
+            const chunks = [];
+            proxyRes.on('data', chunk => chunks.push(chunk));
             proxyRes.on('end', () => {
+                const body = Buffer.concat(chunks).toString('utf8');
                 const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
                 // Rewrite all non-comment lines (URLs) to go through proxy
                 const rewritten = body.replace(/^([^#\s].+)$/gm, (match) => {
