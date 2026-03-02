@@ -125,7 +125,7 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive'
         },
-        timeout: 30000,
+        timeout: 15000,
         rejectUnauthorized: false
     };
 

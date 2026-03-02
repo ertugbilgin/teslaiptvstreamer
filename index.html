@@ -1724,6 +1724,7 @@
                 updateBufferProgress(100);
                 clearTimeout(loadingTimeout);
                 hideVideoLoading();
+                hideVideoError(); // Clear any error if stream starts
             });
             
             video.addEventListener('waiting', () => {
@@ -1733,6 +1734,7 @@
             video.addEventListener('playing', () => {
                 hideBuffering();
                 hideVideoLoading();
+                hideVideoError(); // Clear error when playback starts
             });
             
             video.addEventListener('error', (e) => {
@@ -1766,10 +1768,14 @@
             video.addEventListener('canplay', () => {
                 clearTimeout(loadingTimeout);
                 hideVideoLoading();
+                hideVideoError(); // Clear any error if stream starts
             });
             
             video.addEventListener('waiting', showBuffering);
-            video.addEventListener('playing', hideBuffering);
+            video.addEventListener('playing', () => {
+                hideBuffering();
+                hideVideoError(); // Clear error when playback starts
+            });
             
             video.addEventListener('error', () => {
                 clearTimeout(loadingTimeout);
