@@ -103,6 +103,8 @@ function parseXMLTVDate(dateStr) {
 
 // Proxy request with redirect support
 function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
+    console.log(`[DEBUG] Proxy: ${targetUrl.substring(0, 100)} rewrite=${rewriteUrls} redirect=${redirectCount}`);
+    
     // Prevent infinite redirects
     if (redirectCount > 5) {
         res.statusCode = 508;
@@ -129,6 +131,8 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
     };
 
     const proxyReq = protocol.request(options, (proxyRes) => {
+        console.log(`[DEBUG] Response status: ${proxyRes.statusCode}, content-type: ${proxyRes.headers['content-type']}`);
+        
         // Handle redirects (301, 302, 307, 308)
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
             let redirectUrl = proxyRes.headers.location;
@@ -156,11 +160,18 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
 
         if (rewriteUrls && contentType.includes('mpegurl')) {
             // Rewrite ALL HLS URLs (m3u8 and ts) through proxy for CORS
+            console.log(`[DEBUG] Rewriting manifest: ${targetUrl}, content-type: ${contentType}`);
             let body = '';
             proxyRes.setEncoding('utf8');
             proxyRes.on('data', chunk => body += chunk);
             proxyRes.on('end', () => {
                 const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+                console.log(`[DEBUG] Manifest body length: ${body.length}, baseUrl: ${baseUrl}`);
+                
+                // Log first few lines of manifest
+                const lines = body.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 5);
+                console.log(`[DEBUG] Manifest URLs (first 5):`, lines);
+                
                 const rewritten = body.replace(/^([^#\s].+)$/gm, (match) => {
                     // Skip if already a proxy URL or comment
                     if (match.startsWith('/stream-proxy') || match.startsWith('/proxy') || match.startsWith('#')) {
@@ -168,8 +179,11 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
                     }
                     // Make absolute URL if relative
                     const absoluteUrl = match.startsWith('http') ? match : baseUrl + match;
-                    return `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
+                    const proxiedUrl = `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
+                    console.log(`[DEBUG] Rewrite: ${match.substring(0, 60)}... -> ${proxiedUrl.substring(0, 60)}...`);
+                    return proxiedUrl;
                 });
+                console.log(`[DEBUG] Manifest rewritten, sending response`);
                 res.end(rewritten);
             });
         } else {
@@ -179,7 +193,7 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
     });
 
     proxyReq.on('error', (err) => {
-        console.error('Proxy error:', err.message);
+        console.error('[DEBUG] Proxy error:', err.message, 'for URL:', targetUrl.substring(0, 80));
         res.statusCode = 500;
         res.end(JSON.stringify({ error: err.message }));
     });
