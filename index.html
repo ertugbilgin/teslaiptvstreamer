@@ -1364,7 +1364,8 @@
             document.getElementById('loadingText').textContent = `${icon} ${name} kanalları yükleniyor...`;
             
             try {
-                const response = await fetch('/proxy?url=' + encodeURIComponent(url));
+                // Railway proxy disabled - direct fetch (CORS required)
+                const response = await fetch(url);
                 const m3uContent = await response.text();
                 channels = parseM3U(m3uContent);
                 
@@ -1411,7 +1412,8 @@
                 if (fileInput.files.length > 0) {
                     m3uContent = await fileInput.files[0].text();
                 } else {
-                    const response = await fetch('/proxy?url=' + encodeURIComponent(urlInput.value.trim()));
+                    // Railway proxy disabled - direct fetch (CORS required)
+                    const response = await fetch(urlInput.value.trim());
                     m3uContent = await response.text();
                 }
                 
@@ -1618,7 +1620,8 @@
         }
         
         function setupHLS(video, streamUrl) {
-            const proxyUrl = '/stream-proxy?url=' + encodeURIComponent(streamUrl);
+            // Railway proxy disabled - direct stream
+            const proxyUrl = streamUrl;
             
             hls = new Hls({ 
                 maxBufferLength: 30, 
