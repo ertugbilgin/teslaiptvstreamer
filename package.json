@@ -1,4 +1,10 @@
 {
+  "name": "tesla-iptv",
+  "version": "1.0.0",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js"
+  },
   "dependencies": {
     "xml2js": "^0.6.2"
   }
