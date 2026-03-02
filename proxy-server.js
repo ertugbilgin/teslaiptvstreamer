@@ -102,15 +102,8 @@ function parseXMLTVDate(dateStr) {
     return new Date(year, month, day, hour, minute);
 }
 
-// Proxy request with redirect support
-function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
-    // Prevent infinite redirects
-    if (redirectCount > 5) {
-        res.statusCode = 508;
-        res.end(JSON.stringify({ error: 'Too many redirects' }));
-        return;
-    }
-
+// Proxy request
+function proxyRequest(targetUrl, res, rewriteUrls = false) {
     const parsed = url.parse(targetUrl);
     const protocol = parsed.protocol === 'https:' ? https : http;
 
@@ -125,27 +118,11 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive'
         },
-        timeout: 15000,
+        timeout: 10000,
         rejectUnauthorized: false
     };
 
     const proxyReq = protocol.request(options, (proxyRes) => {
-        // Handle redirects (301, 302, 307, 308)
-        if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
-            let redirectUrl = proxyRes.headers.location;
-            
-            // Resolve relative URLs
-            if (!redirectUrl.startsWith('http')) {
-                redirectUrl = url.resolve(targetUrl, redirectUrl);
-            }
-            
-            console.log(`Redirect ${proxyRes.statusCode}: ${targetUrl} -> ${redirectUrl}`);
-            
-            // Follow redirect recursively
-            proxyRequest(redirectUrl, res, rewriteUrls, redirectCount + 1);
-            return;
-        }
-
         // CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -156,19 +133,13 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
         res.setHeader('Content-Type', contentType);
 
         if (rewriteUrls && contentType.includes('mpegurl')) {
-            // Rewrite HLS manifest URLs - both .m3u8 and .ts files
-            const chunks = [];
-            proxyRes.on('data', chunk => chunks.push(chunk));
+            // Rewrite HLS manifest URLs
+            let body = '';
+            proxyRes.setEncoding('utf8');
+            proxyRes.on('data', chunk => body += chunk);
             proxyRes.on('end', () => {
-                const body = Buffer.concat(chunks).toString('utf8');
                 const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
-                // Rewrite ALL non-comment URLs to go through proxy (required for CORS)
-                const rewritten = body.replace(/^([^#\s].+)$/gm, (match) => {
-                    // Skip if already a proxy URL
-                    if (match.startsWith('/stream-proxy') || match.startsWith('/proxy')) {
-                        return match;
-                    }
-                    // Make absolute URL if relative
+                const rewritten = body.replace(/^([^#].*\.m3u8?)$/gm, (match) => {
                     const absoluteUrl = match.startsWith('http') ? match : baseUrl + match;
                     return `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
                 });
@@ -336,7 +307,8 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚗 Tesla IPTV Server running on port ${PORT}`);
     console.log(`🌐 Domain: https://iptv.evmcp.shop`);
+    console.log(`📡 Listening on 0.0.0.0:${PORT}`);
 });
