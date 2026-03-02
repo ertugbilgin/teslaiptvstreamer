@@ -92,6 +92,7 @@ async function parseEPG(xmlContent) {
 
 // Parse XMLTV date format
 function parseXMLTVDate(dateStr) {
+    // XMLTV format: 20240101120000 +0200
     const year = dateStr.substring(0, 4);
     const month = dateStr.substring(4, 6) - 1;
     const day = dateStr.substring(6, 8);
@@ -101,15 +102,8 @@ function parseXMLTVDate(dateStr) {
     return new Date(year, month, day, hour, minute);
 }
 
-// Proxy request with redirect support
-function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
-    // Prevent infinite redirects
-    if (redirectCount > 5) {
-        res.statusCode = 508;
-        res.end(JSON.stringify({ error: 'Too many redirects' }));
-        return;
-    }
-
+// Proxy request
+function proxyRequest(targetUrl, res, rewriteUrls = false) {
     const parsed = url.parse(targetUrl);
     const protocol = parsed.protocol === 'https:' ? https : http;
 
@@ -129,22 +123,6 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
     };
 
     const proxyReq = protocol.request(options, (proxyRes) => {
-        // Handle redirects (301, 302, 307, 308)
-        if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
-            let redirectUrl = proxyRes.headers.location;
-            
-            // Resolve relative URLs
-            if (!redirectUrl.startsWith('http')) {
-                redirectUrl = url.resolve(targetUrl, redirectUrl);
-            }
-            
-            console.log(`Redirect ${proxyRes.statusCode}: ${targetUrl} -> ${redirectUrl}`);
-            
-            // Follow redirect recursively
-            proxyRequest(redirectUrl, res, rewriteUrls, redirectCount + 1);
-            return;
-        }
-
         // CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -155,7 +133,7 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
         res.setHeader('Content-Type', contentType);
 
         if (rewriteUrls && contentType.includes('mpegurl')) {
-            // Rewrite HLS manifest URLs - only .m3u8 for speed
+            // Rewrite HLS manifest URLs
             let body = '';
             proxyRes.setEncoding('utf8');
             proxyRes.on('data', chunk => body += chunk);
@@ -207,6 +185,7 @@ const server = http.createServer((req, res) => {
 
     // Routes
     if (pathname === '/proxy') {
+        // General proxy endpoint
         const targetUrl = parsedUrl.query.url;
         if (!targetUrl) {
             res.statusCode = 400;
@@ -216,6 +195,7 @@ const server = http.createServer((req, res) => {
         proxyRequest(targetUrl, res);
 
     } else if (pathname === '/stream-proxy') {
+        // Stream proxy with HLS manifest rewriting
         const targetUrl = parsedUrl.query.url;
         if (!targetUrl) {
             res.statusCode = 400;
@@ -225,6 +205,7 @@ const server = http.createServer((req, res) => {
         proxyRequest(targetUrl, res, true);
 
     } else if (pathname === '/epg') {
+        // EPG proxy and parse
         const epgUrl = parsedUrl.query.url;
         if (!epgUrl) {
             res.statusCode = 400;
@@ -280,6 +261,7 @@ const server = http.createServer((req, res) => {
         epgReq.end();
 
     } else if (pathname === '/parse-m3u') {
+        // Parse M3U endpoint
         let body = '';
         req.setEncoding('utf8');
         req.on('data', chunk => body += chunk);
@@ -296,6 +278,7 @@ const server = http.createServer((req, res) => {
         });
 
     } else if (pathname === '/' || pathname === '/index.html') {
+        // Serve main HTML file
         const filePath = path.join(__dirname, 'index.html');
         fs.readFile(filePath, 'utf8', (err, data) => {
             if (err) {
@@ -308,6 +291,7 @@ const server = http.createServer((req, res) => {
         });
 
     } else {
+        // Static files
         const filePath = path.join(__dirname, pathname);
         const ext = path.extname(filePath).toLowerCase();
         
