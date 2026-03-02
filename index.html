@@ -232,6 +232,7 @@
         }
         .player-btn:hover { background: #444; transform: scale(1.02); }
         .player-btn.active { background: linear-gradient(135deg, #ff4444, #cc0000); }
+        .player-btn.offline-hidden { background: linear-gradient(135deg, #7b2cbf, #00d4ff); }
         
         /* Playlist Selector - Tesla Touch Friendly */
         .playlist-section {
@@ -526,6 +527,23 @@
             font-size: 16px;
             opacity: 0.7;
         }
+        .channel-offline-indicator {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            font-size: 18px;
+            opacity: 0.9;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        .channel-card.offline {
+            opacity: 0.6;
+            border-color: #444;
+            background: linear-gradient(145deg, #1a1a1a, #151515);
+        }
+        .channel-card.offline:hover {
+            opacity: 0.8;
+            border-color: #666;
+        }
         
         /* Empty State */
         .empty-state {
@@ -703,9 +721,14 @@
                     <span class="live-badge">CANLI</span>
                     <span id="currentChannelName">Kanal Seçilmedi</span>
                 </div>
-                <button class="player-btn" id="favBtn" onclick="toggleCurrentFavorite()">
-                    <span id="favIcon">🤍</span> Favori
-                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="player-btn" id="offlineToggleBtn" onclick="toggleOfflineFilter()" title="Çalışmayan kanalları gizle/göster">
+                        <span id="offlineIcon">👁️</span> <span id="offlineText">Tümü</span>
+                    </button>
+                    <button class="player-btn" id="favBtn" onclick="toggleCurrentFavorite()">
+                        <span id="favIcon">🤍</span> Favori
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -1010,7 +1033,9 @@
         // State
         let channels = [], 
             favorites = JSON.parse(localStorage.getItem('favorites') || '[]'), 
-            recentChannels = JSON.parse(localStorage.getItem('recentChannels') || '[]'), 
+            recentChannels = JSON.parse(localStorage.getItem('recentChannels') || '[]'),
+            offlineChannels = JSON.parse(localStorage.getItem('offlineChannels') || '[]'),
+            hideOffline = localStorage.getItem('hideOffline') === 'true',
             currentFilter = 'all', 
             currentChannel = null, 
             currentPlaylist = null,
@@ -1024,6 +1049,7 @@
         window.onload = function() {
             renderCountries();
             renderCategories();
+            updateOfflineButtonUI();
             
             // Scroll to top button
             window.addEventListener('scroll', () => {
@@ -1229,15 +1255,28 @@
                 filteredChannels = recentChannels.map(name => channels.find(ch => ch.name === name)).filter(Boolean);
             }
             
+            // Filter out offline channels if hideOffline is enabled
+            let hiddenOfflineCount = 0;
+            if (hideOffline && currentFilter !== 'favorites' && currentFilter !== 'recent') {
+                const beforeFilter = filteredChannels.length;
+                filteredChannels = filteredChannels.filter(ch => !offlineChannels.includes(ch.name));
+                hiddenOfflineCount = beforeFilter - filteredChannels.length;
+            }
+            
             if (searchTerm) {
                 filteredChannels = filteredChannels.filter(ch => ch.name.toLowerCase().includes(searchTerm));
             }
             
             if (filteredChannels.length === 0) {
+                let message = 'Kanal bulunamadı';
+                if (hideOffline && offlineChannels.length > 0) {
+                    message = `Tüm kanallar offline! (${offlineChannels.length} kanal gizli)`;
+                }
                 grid.innerHTML = `
                     <div class="empty-state" style="grid-column: 1/-1;">
                         <div class="empty-state-icon">📺</div>
-                        <p>Kanal bulunamadı</p>
+                        <p>${message}</p>
+                        ${hideOffline && offlineChannels.length > 0 ? `<button class="btn btn-secondary" onclick="toggleOfflineFilter()" style="margin-top:15px;width:auto;padding:12px 24px;">Tüm Kanalları Göster</button>` : ''}
                     </div>
                 `;
                 return;
@@ -1246,14 +1285,29 @@
             grid.innerHTML = filteredChannels.map(channel => {
                 const isFav = favorites.includes(channel.name);
                 const isActive = currentChannel === channel.name;
+                const isOffline = offlineChannels.includes(channel.name);
                 return `
-                    <div class="channel-card ${isActive ? 'active' : ''}" onclick="playChannel('${channel.name}')">
+                    <div class="channel-card ${isActive ? 'active' : ''} ${isOffline ? 'offline' : ''}" onclick="playChannel('${channel.name}')" title="${isOffline ? '⚠️ Son denemede çalışmadı - Tekrar denemek için tıklayın' : channel.name}">
                         ${isFav ? '<span class="channel-fav">❤️</span>' : ''}
+                        ${isOffline ? '<span class="channel-offline-indicator" title="Çalışmıyor">⚠️</span>' : ''}
                         ${channel.logo ? `<img src="${channel.logo}" class="channel-logo" alt="" onerror="this.style.display='none'">` : '<div style="width:48px;height:48px;background:#333;border-radius:10px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:24px;">📺</div>'}
                         <div class="channel-name">${channel.name}</div>
                     </div>
                 `;
             }).join('');
+            
+            // Update offline button to show count
+            updateOfflineButtonUI();
+            
+            // Update channel count display
+            const countEl = document.getElementById('channelCount');
+            if (countEl) {
+                let countText = filteredChannels.length;
+                if (hiddenOfflineCount > 0) {
+                    countText += ` (+${hiddenOfflineCount} gizli)`;
+                }
+                countEl.textContent = countText;
+            }
         }
         
         // Current channel data for retry
@@ -1518,6 +1572,13 @@
             document.getElementById('errorText').textContent = title || 'Yayın yüklenemedi';
             document.getElementById('errorSubtext').textContent = subtitle || 'Bağlantı sorunu veya yayın kapalı olabilir';
             document.getElementById('videoError').classList.add('visible');
+            
+            // Mark channel as offline
+            if (currentChannel && !offlineChannels.includes(currentChannel)) {
+                offlineChannels.push(currentChannel);
+                localStorage.setItem('offlineChannels', JSON.stringify(offlineChannels));
+                renderChannels();
+            }
         }
         
         function hideVideoError() {
@@ -1527,8 +1588,52 @@
         function retryChannel() {
             if (currentChannelData) {
                 hideVideoError();
+                // Remove from offline list when retrying
+                const idx = offlineChannels.indexOf(currentChannelData.name);
+                if (idx > -1) {
+                    offlineChannels.splice(idx, 1);
+                    localStorage.setItem('offlineChannels', JSON.stringify(offlineChannels));
+                    renderChannels();
+                }
                 playChannel(currentChannelData.name);
             }
+        }
+        
+        // ==========================================
+        // OFFLINE CHANNELS MANAGEMENT
+        // ==========================================
+        
+        function toggleOfflineFilter() {
+            hideOffline = !hideOffline;
+            localStorage.setItem('hideOffline', hideOffline);
+            updateOfflineButtonUI();
+            renderChannels();
+        }
+        
+        function updateOfflineButtonUI() {
+            const btn = document.getElementById('offlineToggleBtn');
+            const icon = document.getElementById('offlineIcon');
+            const text = document.getElementById('offlineText');
+            
+            if (hideOffline) {
+                btn.classList.add('offline-hidden');
+                icon.textContent = '🚫';
+                text.textContent = 'Aktif';
+            } else {
+                btn.classList.remove('offline-hidden');
+                icon.textContent = '👁️';
+                text.textContent = 'Tümü';
+            }
+        }
+        
+        function isChannelOffline(channelName) {
+            return offlineChannels.includes(channelName);
+        }
+        
+        function resetOfflineChannels() {
+            offlineChannels = [];
+            localStorage.setItem('offlineChannels', '[]');
+            renderChannels();
         }
         
         // ==========================================
