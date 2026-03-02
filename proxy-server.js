@@ -165,13 +165,19 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             proxyRes.setEncoding('utf8');
             proxyRes.on('data', chunk => body += chunk);
             proxyRes.on('end', () => {
-                const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
-                console.log(`[DEBUG] Manifest body length: ${body.length}, baseUrl: ${baseUrl}`);
-                
-                // Log first few lines of manifest
-                const lines = body.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 5);
-                console.log(`[DEBUG] Manifest URLs (first 5):`, lines);
-                
+                try {
+                    const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+                    console.log(`[DEBUG] Manifest body length: ${body.length}, baseUrl: ${baseUrl}`);
+                    
+                    // Show raw body first 500 chars
+                    console.log(`[DEBUG] Raw body preview:`, body.substring(0, 500));
+                    
+                    // Log all non-comment lines
+                    const allLines = body.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
+                    console.log(`[DEBUG] All URLs (${allLines.length}):`, allLines.slice(0, 10));
+                    
+                    let rewriteCount = 0;
+                    let rewriteCount = 0;
                 const rewritten = body.replace(/^([^#\s].+)$/gm, (match) => {
                     // Skip if already a proxy URL or comment
                     if (match.startsWith('/stream-proxy') || match.startsWith('/proxy') || match.startsWith('#')) {
@@ -180,11 +186,17 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
                     // Make absolute URL if relative
                     const absoluteUrl = match.startsWith('http') ? match : baseUrl + match;
                     const proxiedUrl = `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
-                    console.log(`[DEBUG] Rewrite: ${match.substring(0, 60)}... -> ${proxiedUrl.substring(0, 60)}...`);
+                    rewriteCount++;
+                    console.log(`[DEBUG] Rewrite #${rewriteCount}: ${match.substring(0, 50)}...`);
                     return proxiedUrl;
                 });
-                console.log(`[DEBUG] Manifest rewritten, sending response`);
+                console.log(`[DEBUG] Manifest rewritten (${rewriteCount} URLs), sending response`);
                 res.end(rewritten);
+                } catch (err) {
+                    console.error('[DEBUG] Error in manifest rewrite:', err);
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ error: 'Manifest rewrite failed' }));
+                }
             });
         } else {
             res.writeHead(proxyRes.statusCode);
