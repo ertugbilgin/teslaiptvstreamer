@@ -125,15 +125,11 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive'
         },
-        timeout: 30000,
+        timeout: 10000,
         rejectUnauthorized: false
     };
 
-    console.log(`Proxy request: ${targetUrl} (redirectCount: ${redirectCount})`);
-    
     const proxyReq = protocol.request(options, (proxyRes) => {
-        console.log(`Proxy response: ${targetUrl} - Status: ${proxyRes.statusCode}`);
-        
         // Handle redirects (301, 302, 307, 308)
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
             let redirectUrl = proxyRes.headers.location;
@@ -211,13 +207,7 @@ const server = http.createServer((req, res) => {
     }
 
     // Routes
-    if (pathname === '/health') {
-        // Health check endpoint for Railway
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }));
-        return;
-    } else if (pathname === '/proxy') {
+    if (pathname === '/proxy') {
         // General proxy endpoint
         const targetUrl = parsedUrl.query.url;
         if (!targetUrl) {
@@ -340,9 +330,7 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
     console.log(`🚗 Tesla IPTV Server running on port ${PORT}`);
     console.log(`🌐 Domain: https://iptv.evmcp.shop`);
-    console.log(`📡 Listening on 0.0.0.0:${PORT}`);
 });
-// Deploy timestamp: Mon Mar  2 12:09:49 CET 2026
