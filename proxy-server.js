@@ -211,7 +211,13 @@ const server = http.createServer((req, res) => {
     }
 
     // Routes
-    if (pathname === '/proxy') {
+    if (pathname === '/health') {
+        // Health check endpoint for Railway
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }));
+        return;
+    } else if (pathname === '/proxy') {
         // General proxy endpoint
         const targetUrl = parsedUrl.query.url;
         if (!targetUrl) {
