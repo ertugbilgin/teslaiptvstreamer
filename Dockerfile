@@ -12,8 +12,8 @@ RUN npm install --production 2>/dev/null || echo "No package.json, continuing...
 COPY proxy-server.js ./
 COPY index.html ./
 
-# Port expose et
-EXPOSE 3000
+# Railway otomatik PORT atar (3000 veya 8080)
+# Uygulama process.env.PORT kullanır
 
 # Sunucuyu başlat
 CMD ["node", "proxy-server.js"]
