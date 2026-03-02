@@ -2,126 +2,1131 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>🚗 Tesla IPTV</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%); 
+            color: #fff; 
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
         .container { max-width: 1400px; margin: 0 auto; padding: 15px; }
-        .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 20px; border-radius: 16px; margin-bottom: 15px; text-align: center; }
-        .header h1 { font-size: 24px; background: linear-gradient(90deg, #00d4ff, #7b2cbf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
-        .domain-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3); padding: 8px 16px; border-radius: 20px; font-size: 13px; color: #00d4ff; margin-top: 10px; }
-        .player-section { background: #1a1a1a; border-radius: 16px; overflow: hidden; margin-bottom: 15px; }
-        #videoContainer { position: relative; background: #000; aspect-ratio: 16/9; display: none; }
+        
+        /* Header - Tesla Style */
+        .header { 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+            padding: 20px; 
+            border-radius: 20px; 
+            margin-bottom: 15px; 
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .header h1 { 
+            font-size: 28px; 
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .header p { color: #888; font-size: 14px; }
+        .domain-badge { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px; 
+            background: rgba(0, 212, 255, 0.1); 
+            border: 1px solid rgba(0, 212, 255, 0.3); 
+            padding: 10px 20px; 
+            border-radius: 25px; 
+            font-size: 14px; 
+            color: #00d4ff; 
+            margin-top: 12px;
+        }
+        
+        /* Player Section */
+        .player-section { 
+            background: #1a1a1a; 
+            border-radius: 20px; 
+            overflow: hidden; 
+            margin-bottom: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+        #videoContainer { 
+            position: relative; 
+            background: #000; 
+            aspect-ratio: 16/9; 
+            display: none;
+        }
         #video { width: 100%; height: 100%; object-fit: contain; }
-        .player-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; background: #252525; border-bottom: 1px solid #333; }
-        .player-title { font-size: 14px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 10px; }
-        .live-badge { background: #ff4444; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
-        .player-btn { background: #333; border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
-        .player-btn:hover { background: #444; }
-        .player-btn.active { background: #ff4444; }
-        .setup-section { background: #1a1a1a; padding: 20px; border-radius: 16px; margin-bottom: 15px; display: none; }
-        .input-group { margin-bottom: 12px; }
-        .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .input-group input { width: 100%; padding: 14px; border: 1px solid #333; border-radius: 10px; background: #252525; color: #fff; font-size: 15px; }
-        .btn { width: 100%; padding: 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .btn-primary { background: linear-gradient(135deg, #00d4ff 0%, #7b2cbf 100%); color: #fff; }
-        .btn-secondary { background: #333; color: #fff; margin-top: 10px; }
-        .filters { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
-        .filter-btn { padding: 10px 18px; border: 1px solid #333; border-radius: 20px; background: #1a1a1a; color: #888; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
-        .filter-btn:hover, .filter-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
-        .search-box { margin-bottom: 15px; }
-        .search-box input { width: 100%; padding: 14px 20px; border: 1px solid #333; border-radius: 10px; background: #1a1a1a; color: #fff; font-size: 15px; }
-        .channels-section { background: #1a1a1a; padding: 20px; border-radius: 16px; display: none; }
-        .channels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-        .channel-card { background: #252525; border-radius: 12px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; text-align: center; border: 2px solid transparent; }
-        .channel-card:hover { transform: translateY(-3px); border-color: #00d4ff; background: #2a2a2a; }
-        .channel-card.active { border-color: #00d4ff; background: rgba(0, 212, 255, 0.1); }
-        .channel-logo { width: 36px; height: 36px; object-fit: contain; margin-bottom: 8px; border-radius: 6px; background: #333; }
-        .channel-name { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.4; min-height: 44px; display: flex; align-items: center; justify-content: center; }
-        .loading { display: none; text-align: center; padding: 40px; }
+        
+        /* Video Loading Overlay */
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+        .video-overlay.hidden { opacity: 0; pointer-events: none; }
+        .video-spinner {
+            width: 70px;
+            height: 70px;
+            border: 4px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        .video-loading-text {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+        .video-buffer-bar {
+            width: 200px;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .video-buffer-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Error State */
+        .video-error {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            padding: 30px;
+        }
+        .video-error.visible { display: flex; }
+        .video-error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #ff4444;
+        }
+        .video-error-text {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .video-error-subtext {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .retry-btn {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .retry-btn:hover { transform: scale(1.05); }
+        
+        /* Buffering Indicator */
+        .buffering-indicator {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            z-index: 15;
+        }
+        .buffering-indicator.visible { display: flex; }
+        .buffering-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .player-header { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 15px 20px; 
+            background: #252525; 
+            border-bottom: 1px solid #333; 
+        }
+        .player-title { 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #fff; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        .live-badge { 
+            background: linear-gradient(135deg, #ff4444, #cc0000); 
+            color: #fff; 
+            padding: 5px 12px; 
+            border-radius: 6px; 
+            font-size: 11px; 
+            font-weight: bold; 
+            text-transform: uppercase;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .player-btn { 
+            background: #333; 
+            border: none; 
+            color: #fff; 
+            padding: 12px 18px; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            transition: all 0.2s; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+            min-height: 48px;
+        }
+        .player-btn:hover { background: #444; transform: scale(1.02); }
+        .player-btn.active { background: linear-gradient(135deg, #ff4444, #cc0000); }
+        
+        /* Playlist Selector - Tesla Touch Friendly */
+        .playlist-section {
+            background: #1a1a1a;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+        .playlist-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            scrollbar-width: none;
+        }
+        .playlist-tabs::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            padding: 14px 24px;
+            border: 2px solid #333;
+            border-radius: 14px;
+            background: #252525;
+            color: #888;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tab-btn:hover { border-color: #555; color: #fff; }
+        .tab-btn.active { 
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf); 
+            color: #fff; 
+            border-color: transparent;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        /* Country Grid */
+        .country-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .country-card {
+            background: linear-gradient(145deg, #252525, #1e1e1e);
+            border-radius: 16px;
+            padding: 20px 15px;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-align: center;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        .country-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .country-card:hover { 
+            transform: translateY(-4px); 
+            border-color: #00d4ff; 
+            box-shadow: 0 12px 30px rgba(0, 212, 255, 0.2);
+        }
+        .country-card:hover::before { opacity: 1; }
+        .country-card.active { 
+            border-color: #00d4ff; 
+            background: linear-gradient(145deg, rgba(0, 212, 255, 0.15), #1e1e1e);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.25);
+        }
+        .country-card.active::before { opacity: 1; }
+        .country-flag {
+            font-size: 42px;
+            margin-bottom: 10px;
+            display: block;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+        .country-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .country-count {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        /* Category Grid */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        .category-card {
+            background: linear-gradient(145deg, #252525, #1e1e1e);
+            border-radius: 14px;
+            padding: 18px 12px;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+        .category-card:hover { 
+            transform: translateY(-3px); 
+            border-color: #7b2cbf; 
+            box-shadow: 0 10px 25px rgba(123, 44, 191, 0.2);
+        }
+        .category-card.active { 
+            border-color: #7b2cbf; 
+            background: linear-gradient(145deg, rgba(123, 44, 191, 0.15), #1e1e1e);
+        }
+        .category-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: block;
+            background: linear-gradient(135deg, #7b2cbf, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .category-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: #fff;
+        }
+        
+        /* Loading */
+        .loading { 
+            display: none; 
+            text-align: center; 
+            padding: 50px 20px; 
+            background: #1a1a1a;
+            border-radius: 20px;
+            margin-bottom: 15px;
+        }
         .loading.active { display: block; }
-        .spinner { width: 50px; height: 50px; border: 3px solid #333; border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+        .spinner { 
+            width: 60px; 
+            height: 60px; 
+            border: 4px solid #333; 
+            border-top-color: #00d4ff; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+            margin: 0 auto 20px; 
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .auto-load-msg { background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center; color: #00d4ff; font-size: 14px; }
+        .loading-text { color: #888; font-size: 16px; }
+        
+        /* Channels Section */
+        .channels-section { 
+            background: #1a1a1a; 
+            padding: 20px; 
+            border-radius: 20px; 
+            display: none;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .channels-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .channels-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* Filters */
+        .filters { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 15px; 
+            overflow-x: auto; 
+            padding-bottom: 5px;
+            scrollbar-width: none;
+        }
+        .filters::-webkit-scrollbar { display: none; }
+        .filter-btn { 
+            padding: 12px 20px; 
+            border: 2px solid #333; 
+            border-radius: 25px; 
+            background: #252525; 
+            color: #888; 
+            font-size: 14px; 
+            font-weight: 500;
+            cursor: pointer; 
+            white-space: nowrap; 
+            transition: all 0.2s;
+            min-height: 46px;
+        }
+        .filter-btn:hover { border-color: #555; color: #fff; }
+        .filter-btn.active { 
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf); 
+            color: #000; 
+            border-color: transparent;
+            font-weight: 600;
+        }
+        
+        /* Search */
+        .search-box { margin-bottom: 15px; }
+        .search-box input { 
+            width: 100%; 
+            padding: 16px 24px; 
+            border: 2px solid #333; 
+            border-radius: 14px; 
+            background: #252525; 
+            color: #fff; 
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+        .search-box input::placeholder { color: #666; }
+        
+        /* Channels Grid */
+        .channels-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+            gap: 12px; 
+        }
+        .channel-card { 
+            background: linear-gradient(145deg, #252525, #1e1e1e); 
+            border-radius: 16px; 
+            padding: 16px 12px; 
+            cursor: pointer; 
+            transition: all 0.25s; 
+            text-align: center; 
+            border: 2px solid transparent;
+            position: relative;
+        }
+        .channel-card:hover { 
+            transform: translateY(-4px); 
+            border-color: #00d4ff; 
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.15);
+        }
+        .channel-card.active { 
+            border-color: #00d4ff; 
+            background: linear-gradient(145deg, rgba(0, 212, 255, 0.1), #1e1e1e);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.2);
+        }
+        .channel-logo { 
+            width: 48px; 
+            height: 48px; 
+            object-fit: contain; 
+            margin-bottom: 10px; 
+            border-radius: 10px; 
+            background: #333; 
+        }
+        .channel-name { 
+            font-size: 12px; 
+            font-weight: 500; 
+            color: #fff; 
+            line-height: 1.4; 
+            min-height: 34px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        .channel-fav {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 16px;
+            opacity: 0.7;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        /* Back Button */
+        .back-btn {
+            padding: 12px 24px;
+            border: 2px solid #333;
+            border-radius: 12px;
+            background: #252525;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .back-btn:hover {
+            border-color: #00d4ff;
+            background: #2a2a2a;
+        }
+        
+        /* Custom URL Section */
+        .custom-url-section {
+            background: linear-gradient(145deg, #252525, #1e1e1e);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 2px dashed #333;
+        }
+        .custom-url-section h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #888;
+        }
+        .input-group { margin-bottom: 12px; }
+        .input-group label { 
+            display: block; 
+            font-size: 13px; 
+            color: #888; 
+            margin-bottom: 8px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        .input-group input { 
+            width: 100%; 
+            padding: 16px; 
+            border: 2px solid #333; 
+            border-radius: 12px; 
+            background: #1a1a1a; 
+            color: #fff; 
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .btn { 
+            width: 100%; 
+            padding: 18px; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.2s;
+            min-height: 56px;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #00d4ff 0%, #7b2cbf 100%); 
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+        .btn-primary:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 212, 255, 0.4);
+        }
+        .btn-secondary { 
+            background: #333; 
+            color: #fff; 
+            margin-top: 10px; 
+        }
+        .btn-secondary:hover { background: #444; }
+        
+        /* Scroll to top */
+        .scroll-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+            z-index: 1000;
+        }
+        .scroll-top.visible { display: flex; }
+        
+        /* Responsive for Tesla */
+        @media (min-width: 1024px) {
+            .country-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+            .category-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+            .channels-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+        }
+        
+        /* Hide sections */
+        .section-content { display: none; }
+        .section-content.active { display: block; }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
             <h1>🚗 Tesla IPTV</h1>
-            <p style="color: #888; font-size: 14px;">Araç içi IPTV yayını</p>
-            <div class="domain-badge">🌐 iptv.evmcp.shop</div>
-        </div>
-        <div class="player-section">
-            <div id="videoContainer"><video id="video" controls playsinline></video></div>
-            <div class="player-header" id="playerHeader" style="display: none;">
-                <div class="player-title"><span class="live-badge">CANLI</span><span id="currentChannelName">Kanal Seçilmedi</span></div>
-                <button class="player-btn" id="favBtn" onclick="toggleCurrentFavorite()"><span id="favIcon">🤍</span> Favori</button>
+            <p>Araç içi IPTV yayını - Uluslararası & Kategori</p>
+            <div class="domain-badge">
+                <i class="fas fa-globe"></i>
+                iptv.evmcp.shop
             </div>
         </div>
+        
+        <!-- Player -->
+        <div class="player-section">
+            <div id="videoContainer">
+                <video id="video" controls playsinline></video>
+                
+                <!-- Loading Overlay -->
+                <div class="video-overlay" id="videoOverlay">
+                    <div class="video-spinner"></div>
+                    <div class="video-loading-text" id="loadingText">Yayın yükleniyor...</div>
+                    <div class="video-buffer-bar">
+                        <div class="video-buffer-progress" id="bufferProgress"></div>
+                    </div>
+                </div>
+                
+                <!-- Buffering Indicator -->
+                <div class="buffering-indicator" id="bufferingIndicator">
+                    <div class="buffering-spinner"></div>
+                    <span>Buffering...</span>
+                </div>
+                
+                <!-- Error Overlay -->
+                <div class="video-error" id="videoError">
+                    <div class="video-error-icon">⚠️</div>
+                    <div class="video-error-text" id="errorText">Yayın yüklenemedi</div>
+                    <div class="video-error-subtext" id="errorSubtext">Bağlantı sorunu veya yayın kapalı olabilir</div>
+                    <button class="retry-btn" onclick="retryChannel()">
+                        <i class="fas fa-redo"></i> Tekrar Dene
+                    </button>
+                </div>
+            </div>
+            <div class="player-header" id="playerHeader" style="display: none;">
+                <div class="player-title">
+                    <span class="live-badge">CANLI</span>
+                    <span id="currentChannelName">Kanal Seçilmedi</span>
+                </div>
+                <button class="player-btn" id="favBtn" onclick="toggleCurrentFavorite()">
+                    <span id="favIcon">🤍</span> Favori
+                </button>
+            </div>
+        </div>
+        
+        <!-- Loading -->
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p id="loadingText">Türkiye kanal listesi yükleniyor...</p>
+            <p class="loading-text" id="loadingText">Kanallar yükleniyor...</p>
         </div>
-        <div class="setup-section" id="setupSection">
-            <div class="auto-load-msg">🇹🇷 Varsayılan: Türkiye kanal listesi otomatik yüklenir</div>
-            <div class="input-group">
-                <label>🔗 Başka M3U Playlist URL (Opsiyonel)</label>
-                <input type="text" id="m3uUrl" placeholder="https://ornek.com/playlist.m3u">
+        
+        <!-- Playlist Selector -->
+        <div class="playlist-section" id="playlistSection">
+            <div class="playlist-tabs">
+                <button class="tab-btn active" onclick="switchTab('countries')">
+                    <i class="fas fa-flag"></i> Ülkeler
+                </button>
+                <button class="tab-btn" onclick="switchTab('categories')">
+                    <i class="fas fa-th-large"></i> Kategoriler
+                </button>
+                <button class="tab-btn" onclick="switchTab('custom')">
+                    <i class="fas fa-link"></i> Özel URL
+                </button>
             </div>
-            <div class="input-group">
-                <label>📋 Veya M3U Dosya Seç</label>
-                <input type="file" id="m3uFile" accept=".m3u,.m3u8" style="padding: 10px;">
-            </div>
-            <button class="btn btn-primary" onclick="loadCustomPlaylist()">📺 Yükle</button>
-            <button class="btn btn-secondary" onclick="loadDefaultPlaylist()">🔄 Varsayılan Türkiye Listesine Dön</button>
-        </div>
-        <div class="channels-section" id="channelsSection">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <div class="filters">
-                    <button class="filter-btn active" onclick="filterChannels('all')">Tümü</button>
-                    <button class="filter-btn" onclick="filterChannels('favorites')">❤️ Favoriler</button>
-                    <button class="filter-btn" onclick="filterChannels('recent')">🕐 Son İzlenen</button>
+            
+            <!-- Countries Section -->
+            <div class="section-content active" id="countriesSection">
+                <div class="section-title">
+                    <i class="fas fa-globe-americas" style="color: #00d4ff;"></i>
+                    Ülke Seçin
                 </div>
-                <button class="btn btn-secondary" style="width: auto; padding: 10px 20px; font-size: 12px; margin: 0;" onclick="showSetup()">⚙️ Başka Liste</button>
+                <div class="country-grid" id="countryGrid"></div>
             </div>
-            <div class="search-box"><input type="text" id="searchInput" placeholder="🔍 Kanal ara..." oninput="searchChannels()"></div>
+            
+            <!-- Categories Section -->
+            <div class="section-content" id="categoriesSection">
+                <div class="section-title">
+                    <i class="fas fa-tv" style="color: #7b2cbf;"></i>
+                    Kategori Seçin
+                </div>
+                <div class="category-grid" id="categoryGrid"></div>
+            </div>
+            
+            <!-- Custom URL Section -->
+            <div class="section-content" id="customSection">
+                <div class="custom-url-section">
+                    <h3><i class="fas fa-link"></i> Özel M3U Playlist</h3>
+                    <div class="input-group">
+                        <label>🔗 Playlist URL</label>
+                        <input type="text" id="m3uUrl" placeholder="https://ornek.com/playlist.m3u">
+                    </div>
+                    <div class="input-group">
+                        <label>📋 Veya Dosya Seç</label>
+                        <input type="file" id="m3uFile" accept=".m3u,.m3u8" style="padding: 12px;">
+                    </div>
+                    <button class="btn btn-primary" onclick="loadCustomPlaylist()">
+                        <i class="fas fa-play"></i> Yükle ve Oynat
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Channels Section -->
+        <div class="channels-section" id="channelsSection">
+            <div class="channels-header">
+                <div class="channels-title">
+                    <span id="currentPlaylistIcon">🇹🇷</span>
+                    <span id="currentPlaylistName">Türkiye</span>
+                    <span style="color: #888; font-size: 14px; font-weight: 400;">
+                        (<span id="channelCount">0</span> kanal)
+                    </span>
+                </div>
+                <button class="back-btn" onclick="backToPlaylists()">
+                    <i class="fas fa-arrow-left"></i> Geri
+                </button>
+            </div>
+            <div class="filters">
+                <button class="filter-btn active" onclick="filterChannels('all')">Tümü</button>
+                <button class="filter-btn" onclick="filterChannels('favorites')">❤️ Favoriler</button>
+                <button class="filter-btn" onclick="filterChannels('recent')">🕐 Son İzlenen</button>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 Kanal ara..." oninput="searchChannels()">
+            </div>
             <div class="channels-grid" id="channelsGrid"></div>
         </div>
     </div>
+    
+    <!-- Scroll to top -->
+    <button class="scroll-top" id="scrollTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
     <script>
-        const DEFAULT_M3U_URL = 'https://streams.uzunmuhalefet.com/lists/tr.m3u';
-        const DEFAULT_EPG_URL = 'https://streams.uzunmuhalefet.com/epg/tr.xml';
-        let channels=[], favorites=JSON.parse(localStorage.getItem('favorites')||'[]'), recentChannels=JSON.parse(localStorage.getItem('recentChannels')||'[]'), currentFilter='all', currentChannel=null, hls=null, epgData=null;
+        // ==========================================
+        // IPTV PLAYLIST CONFIGURATION
+        // ==========================================
         
-        // Sayfa yüklenince otomatik başlat
-        window.onload = function() {
-            loadDefaultPlaylist();
+        // Türkiye - Özel liste (kendi kaynağımız)
+        const TURKEY_URL = 'https://streams.uzunmuhalefet.com/lists/tr.m3u';
+        const TURKEY_EPG = 'https://streams.uzunmuhalefet.com/epg/tr.xml';
+        
+        // iptv-org Country Playlists (GitHub raw URLs)
+        const COUNTRY_PLAYLISTS = {
+            tr: { 
+                name: 'Türkiye', 
+                flag: '🇹🇷', 
+                url: TURKEY_URL,
+                epg: TURKEY_EPG,
+                custom: true
+            },
+            cn: { 
+                name: 'Chinese', 
+                flag: '🇨🇳', 
+                url: 'https://iptv-org.github.io/iptv/languages/zho.m3u',
+                epg: null
+            },
+            dk: { 
+                name: 'Danish', 
+                flag: '🇩🇰', 
+                url: 'https://iptv-org.github.io/iptv/languages/dan.m3u',
+                epg: null
+            },
+            nl: { 
+                name: 'Dutch', 
+                flag: '🇳🇱', 
+                url: 'https://iptv-org.github.io/iptv/languages/nld.m3u',
+                epg: null
+            },
+            gb: { 
+                name: 'English', 
+                flag: '🇬🇧', 
+                url: 'https://iptv-org.github.io/iptv/languages/eng.m3u',
+                epg: null
+            },
+            fi: { 
+                name: 'Finnish', 
+                flag: '🇫🇮', 
+                url: 'https://iptv-org.github.io/iptv/languages/fin.m3u',
+                epg: null
+            },
+            fr: { 
+                name: 'French', 
+                flag: '🇫🇷', 
+                url: 'https://iptv-org.github.io/iptv/languages/fra.m3u',
+                epg: null
+            },
+            de: { 
+                name: 'German', 
+                flag: '🇩🇪', 
+                url: 'https://iptv-org.github.io/iptv/languages/deu.m3u',
+                epg: null
+            },
+            in: { 
+                name: 'Hindi', 
+                flag: '🇮🇳', 
+                url: 'https://iptv-org.github.io/iptv/languages/hin.m3u',
+                epg: null
+            },
+            it: { 
+                name: 'Italian', 
+                flag: '🇮🇹', 
+                url: 'https://iptv-org.github.io/iptv/languages/ita.m3u',
+                epg: null
+            },
+            ru: { 
+                name: 'Russian', 
+                flag: '🇷🇺', 
+                url: 'https://iptv-org.github.io/iptv/languages/rus.m3u',
+                epg: null
+            },
+            es: { 
+                name: 'Spanish', 
+                flag: '🇪🇸', 
+                url: 'https://iptv-org.github.io/iptv/languages/spa.m3u',
+                epg: null
+            }
         };
         
-        async function loadDefaultPlaylist() {
+        // iptv-org Category Playlists
+        const CATEGORY_PLAYLISTS = {
+            animation: { 
+                name: 'Animation', 
+                icon: '🎬', 
+                faIcon: 'fa-film',
+                url: 'https://iptv-org.github.io/iptv/categories/animation.m3u' 
+            },
+            auto: { 
+                name: 'Auto', 
+                icon: '🚗', 
+                faIcon: 'fa-car',
+                url: 'https://iptv-org.github.io/iptv/categories/auto.m3u' 
+            },
+            business: { 
+                name: 'Business', 
+                icon: '💼', 
+                faIcon: 'fa-briefcase',
+                url: 'https://iptv-org.github.io/iptv/categories/business.m3u' 
+            },
+            classic: { 
+                name: 'Classic', 
+                icon: '🎭', 
+                faIcon: 'fa-theater-masks',
+                url: 'https://iptv-org.github.io/iptv/categories/classic.m3u' 
+            },
+            comedy: { 
+                name: 'Comedy', 
+                icon: '😂', 
+                faIcon: 'fa-laugh-beam',
+                url: 'https://iptv-org.github.io/iptv/categories/comedy.m3u' 
+            },
+            cooking: { 
+                name: 'Cooking', 
+                icon: '👨‍🍳', 
+                faIcon: 'fa-utensils',
+                url: 'https://iptv-org.github.io/iptv/categories/cooking.m3u' 
+            },
+            culture: { 
+                name: 'Culture', 
+                icon: '🎨', 
+                faIcon: 'fa-palette',
+                url: 'https://iptv-org.github.io/iptv/categories/culture.m3u' 
+            },
+            documentary: { 
+                name: 'Documentary', 
+                icon: '📹', 
+                faIcon: 'fa-video',
+                url: 'https://iptv-org.github.io/iptv/categories/documentary.m3u' 
+            },
+            entertainment: { 
+                name: 'Entertainment', 
+                icon: '🎪', 
+                faIcon: 'fa-star',
+                url: 'https://iptv-org.github.io/iptv/categories/entertainment.m3u' 
+            },
+            family: { 
+                name: 'Family', 
+                icon: '👨‍👩‍👧‍👦', 
+                faIcon: 'fa-users',
+                url: 'https://iptv-org.github.io/iptv/categories/family.m3u' 
+            },
+            kids: { 
+                name: 'Kids', 
+                icon: '🧸', 
+                faIcon: 'fa-child',
+                url: 'https://iptv-org.github.io/iptv/categories/kids.m3u' 
+            },
+            lifestyle: { 
+                name: 'Lifestyle', 
+                icon: '✨', 
+                faIcon: 'fa-magic',
+                url: 'https://iptv-org.github.io/iptv/categories/lifestyle.m3u' 
+            },
+            movies: { 
+                name: 'Movies', 
+                icon: '🍿', 
+                faIcon: 'fa-film',
+                url: 'https://iptv-org.github.io/iptv/categories/movies.m3u' 
+            },
+            music: { 
+                name: 'Music', 
+                icon: '🎵', 
+                faIcon: 'fa-music',
+                url: 'https://iptv-org.github.io/iptv/categories/music.m3u' 
+            },
+            news: { 
+                name: 'News', 
+                icon: '📰', 
+                faIcon: 'fa-newspaper',
+                url: 'https://iptv-org.github.io/iptv/categories/news.m3u' 
+            },
+            outdoor: { 
+                name: 'Outdoor', 
+                icon: '🏕️', 
+                faIcon: 'fa-campground',
+                url: 'https://iptv-org.github.io/iptv/categories/outdoor.m3u' 
+            },
+            series: { 
+                name: 'Series', 
+                icon: '📺', 
+                faIcon: 'fa-tv',
+                url: 'https://iptv-org.github.io/iptv/categories/series.m3u' 
+            },
+            science: { 
+                name: 'Science', 
+                icon: '🔬', 
+                faIcon: 'fa-flask',
+                url: 'https://iptv-org.github.io/iptv/categories/science.m3u' 
+            },
+            sports: { 
+                name: 'Sports', 
+                icon: '⚽', 
+                faIcon: 'fa-futbol',
+                url: 'https://iptv-org.github.io/iptv/categories/sports.m3u' 
+            },
+            travel: { 
+                name: 'Travel', 
+                icon: '✈️', 
+                faIcon: 'fa-plane',
+                url: 'https://iptv-org.github.io/iptv/categories/travel.m3u' 
+            }
+        };
+        
+        // State
+        let channels = [], 
+            favorites = JSON.parse(localStorage.getItem('favorites') || '[]'), 
+            recentChannels = JSON.parse(localStorage.getItem('recentChannels') || '[]'), 
+            currentFilter = 'all', 
+            currentChannel = null, 
+            currentPlaylist = null,
+            hls = null, 
+            epgData = null;
+        
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        
+        window.onload = function() {
+            renderCountries();
+            renderCategories();
+            
+            // Scroll to top button
+            window.addEventListener('scroll', () => {
+                document.getElementById('scrollTop').classList.toggle('visible', window.scrollY > 300);
+            });
+        };
+        
+        // ==========================================
+        // UI RENDERING
+        // ==========================================
+        
+        function renderCountries() {
+            const grid = document.getElementById('countryGrid');
+            grid.innerHTML = Object.entries(COUNTRY_PLAYLISTS).map(([code, data]) => `
+                <div class="country-card" onclick="loadPlaylist('country', '${code}')" id="country-${code}">
+                    <span class="country-flag">${data.flag}</span>
+                    <div class="country-name">${data.name}</div>
+                </div>
+            `).join('');
+        }
+        
+        function renderCategories() {
+            const grid = document.getElementById('categoryGrid');
+            grid.innerHTML = Object.entries(CATEGORY_PLAYLISTS).map(([code, data]) => `
+                <div class="category-card" onclick="loadPlaylist('category', '${code}')" id="category-${code}">
+                    <span class="category-icon"><i class="fas ${data.faIcon}"></i></span>
+                    <div class="category-name">${data.icon} ${data.name}</div>
+                </div>
+            `).join('');
+        }
+        
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.closest('.tab-btn').classList.add('active');
+            
+            // Update sections
+            document.querySelectorAll('.section-content').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(tab + 'Section').classList.add('active');
+        }
+        
+        // ==========================================
+        // PLAYLIST LOADING
+        // ==========================================
+        
+        async function loadPlaylist(type, code) {
+            let url, name, icon;
+            
+            if (type === 'country') {
+                const data = COUNTRY_PLAYLISTS[code];
+                url = data.url;
+                name = data.name;
+                icon = data.flag;
+                currentPlaylist = { type: 'country', code, epg: data.epg };
+                
+                // Highlight selected
+                document.querySelectorAll('.country-card').forEach(c => c.classList.remove('active'));
+                document.getElementById(`country-${code}`).classList.add('active');
+            } else {
+                const data = CATEGORY_PLAYLISTS[code];
+                url = data.url;
+                name = data.name;
+                icon = data.icon;
+                currentPlaylist = { type: 'category', code };
+                
+                // Highlight selected
+                document.querySelectorAll('.category-card').forEach(c => c.classList.remove('active'));
+                document.getElementById(`category-${code}`).classList.add('active');
+            }
+            
+            // Show loading
             document.getElementById('loading').classList.add('active');
-            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('playlistSection').style.display = 'none';
             document.getElementById('channelsSection').style.display = 'none';
-            document.getElementById('loadingText').textContent = '🇹🇷 Türkiye kanal listesi yükleniyor...';
+            document.getElementById('loadingText').textContent = `${icon} ${name} kanalları yükleniyor...`;
             
             try {
-                const response = await fetch('/proxy?url=' + encodeURIComponent(DEFAULT_M3U_URL));
+                const response = await fetch('/proxy?url=' + encodeURIComponent(url));
                 const m3uContent = await response.text();
                 channels = parseM3U(m3uContent);
                 
-                // EPG'yi de yükle (arka planda)
-                loadEPG(DEFAULT_EPG_URL);
+                // Load EPG if available
+                if (currentPlaylist.epg) {
+                    loadEPG(currentPlaylist.epg);
+                }
                 
+                // Update UI
                 document.getElementById('loading').classList.remove('active');
                 document.getElementById('channelsSection').style.display = 'block';
+                document.getElementById('currentPlaylistIcon').textContent = icon;
+                document.getElementById('currentPlaylistName').textContent = name;
+                document.getElementById('channelCount').textContent = channels.length;
+                
                 renderChannels();
+                
+                // Scroll to channels
+                document.getElementById('channelsSection').scrollIntoView({ behavior: 'smooth' });
+                
             } catch (error) {
                 document.getElementById('loading').classList.remove('active');
-                document.getElementById('setupSection').style.display = 'block';
-                alert('Varsayılan liste yüklenemedi. Lütfen başka bir liste yükleyin.');
+                document.getElementById('playlistSection').style.display = 'block';
+                alert(`❌ ${name} listesi yüklenemedi. Lütfen tekrar deneyin.`);
+                console.error('Playlist load error:', error);
             }
         }
         
@@ -135,8 +1140,8 @@
             }
             
             document.getElementById('loading').classList.add('active');
-            document.getElementById('setupSection').style.display = 'none';
-            document.getElementById('loadingText').textContent = 'Kanallar yükleniyor...';
+            document.getElementById('playlistSection').style.display = 'none';
+            document.getElementById('loadingText').textContent = 'Özel playlist yükleniyor...';
             
             try {
                 let m3uContent = '';
@@ -148,43 +1153,62 @@
                 }
                 
                 channels = parseM3U(m3uContent);
+                currentPlaylist = { type: 'custom', name: 'Özel Liste' };
+                
                 document.getElementById('loading').classList.remove('active');
                 document.getElementById('channelsSection').style.display = 'block';
+                document.getElementById('currentPlaylistIcon').textContent = '🔗';
+                document.getElementById('currentPlaylistName').textContent = 'Özel Liste';
+                document.getElementById('channelCount').textContent = channels.length;
+                
                 renderChannels();
+                
             } catch (error) {
                 document.getElementById('loading').classList.remove('active');
-                document.getElementById('setupSection').style.display = 'block';
-                alert('Hata: ' + error.message);
+                document.getElementById('playlistSection').style.display = 'block';
+                alert('❌ Hata: ' + error.message);
             }
         }
         
-        function showSetup() {
-            document.getElementById('setupSection').style.display = 'block';
+        function backToPlaylists() {
             document.getElementById('channelsSection').style.display = 'none';
+            document.getElementById('playlistSection').style.display = 'block';
+            
+            // Clear active states
+            document.querySelectorAll('.country-card, .category-card').forEach(c => c.classList.remove('active'));
+            
+            // Reset filters
+            currentFilter = 'all';
+            document.getElementById('searchInput').value = '';
+            updateFilterButtons();
         }
         
-        async function loadEPG(url) {
-            try {
-                const response = await fetch('/epg?url=' + encodeURIComponent(url));
-                epgData = await response.json();
-                renderChannels();
-            } catch (e) {
-                console.error('EPG yüklenemedi:', e);
-            }
-        }
+        // ==========================================
+        // CHANNEL FUNCTIONS
+        // ==========================================
         
         function parseM3U(content) {
             const lines = content.split('\n'), channels = [];
             let currentChannel = null;
+            
             for (const line of lines) {
                 const trimmed = line.trim();
                 if (trimmed.startsWith('#EXTINF:')) {
                     const nameMatch = trimmed.match(/tvg-name="([^"]+)"/);
                     const logoMatch = trimmed.match(/tvg-logo="([^"]+)"/);
                     const idMatch = trimmed.match(/tvg-id="([^"]+)"/);
+                    const groupMatch = trimmed.match(/group-title="([^"]+)"/);
+                    
                     let name = trimmed.split(',').pop() || 'Bilinmeyen Kanal';
                     if (nameMatch) name = nameMatch[1];
-                    currentChannel = { id: idMatch ? idMatch[1] : name, name: name, logo: logoMatch ? logoMatch[1] : null, url: null };
+                    
+                    currentChannel = { 
+                        id: idMatch ? idMatch[1] : name, 
+                        name: name, 
+                        logo: logoMatch ? logoMatch[1] : null, 
+                        group: groupMatch ? groupMatch[1] : null,
+                        url: null 
+                    };
                 } else if (trimmed && !trimmed.startsWith('#') && currentChannel) {
                     currentChannel.url = trimmed;
                     channels.push(currentChannel);
@@ -210,52 +1234,306 @@
             }
             
             if (filteredChannels.length === 0) {
-                grid.innerHTML = '<div style="text-align:center;padding:40px;color:#666;"><div style="font-size:48px;margin-bottom:15px;opacity:0.5;">📺</div><p>Kanal bulunamadı</p></div>';
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="empty-state-icon">📺</div>
+                        <p>Kanal bulunamadı</p>
+                    </div>
+                `;
                 return;
             }
             
             grid.innerHTML = filteredChannels.map(channel => {
                 const isFav = favorites.includes(channel.name);
                 const isActive = currentChannel === channel.name;
-                return `<div class="channel-card ${isActive ? 'active' : ''}" onclick="playChannel('${channel.name}')">${channel.logo ? `<img src="${channel.logo}" class="channel-logo" alt="" onerror="this.style.display='none'">` : ''}<div class="channel-name">${channel.name}</div></div>`;
+                return `
+                    <div class="channel-card ${isActive ? 'active' : ''}" onclick="playChannel('${channel.name}')">
+                        ${isFav ? '<span class="channel-fav">❤️</span>' : ''}
+                        ${channel.logo ? `<img src="${channel.logo}" class="channel-logo" alt="" onerror="this.style.display='none'">` : '<div style="width:48px;height:48px;background:#333;border-radius:10px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:24px;">📺</div>'}
+                        <div class="channel-name">${channel.name}</div>
+                    </div>
+                `;
             }).join('');
         }
+        
+        // Current channel data for retry
+        let currentChannelData = null;
+        let loadingTimeout = null;
+        let retryCount = 0;
+        const MAX_RETRIES = 3;
         
         async function playChannel(channelName) {
             const channel = channels.find(ch => ch.name === channelName);
             if (!channel) return;
             
             currentChannel = channelName;
+            currentChannelData = channel;
+            retryCount = 0;
+            
+            // Show player UI
             document.getElementById('videoContainer').style.display = 'block';
             document.getElementById('playerHeader').style.display = 'flex';
             document.getElementById('currentChannelName').textContent = channel.name;
             updateFavButton();
             renderChannels();
             
+            // Show loading overlay
+            showVideoLoading();
+            hideVideoError();
+            
+            // Update recent
             recentChannels = recentChannels.filter(name => name !== channelName);
             recentChannels.unshift(channelName);
             if (recentChannels.length > 10) recentChannels = recentChannels.slice(0, 10);
             localStorage.setItem('recentChannels', JSON.stringify(recentChannels));
             
-            if (hls) { hls.destroy(); hls = null; }
-            const video = document.getElementById('video');
-            
-            if (channel.url.includes('.m3u8') || channel.url.includes('hls')) {
-                if (Hls.isSupported()) {
-                    hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60, enableWorker: true });
-                    hls.loadSource('/stream-proxy?url=' + encodeURIComponent(channel.url));
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-                } else {
-                    video.src = channel.url;
-                    video.play().catch(() => {});
-                }
-            } else {
-                video.src = channel.url;
-                video.play().catch(() => {});
+            // Cleanup previous HLS
+            if (hls) { 
+                hls.destroy(); 
+                hls = null; 
             }
+            
+            const video = document.getElementById('video');
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            
+            // Set timeout for loading (15 seconds)
+            loadingTimeout = setTimeout(() => {
+                showVideoError('Yükleme zaman aşımı', 'Yayın çok yavaş yanıt veriyor veya kapalı olabilir.');
+            }, 15000);
+            
+            try {
+                if (channel.url.includes('.m3u8') || channel.url.includes('hls')) {
+                    if (Hls.isSupported()) {
+                        setupHLS(video, channel.url);
+                    } else {
+                        // Native HLS (Safari/iOS)
+                        setupNativeHLS(video, channel.url);
+                    }
+                } else {
+                    // Direct stream (MP4, etc.)
+                    setupDirectStream(video, channel.url);
+                }
+            } catch (error) {
+                console.error('Play error:', error);
+                showVideoError('Oynatma hatası', error.message);
+            }
+            
             document.getElementById('videoContainer').scrollIntoView({ behavior: 'smooth' });
         }
+        
+        function setupHLS(video, streamUrl) {
+            const proxyUrl = '/stream-proxy?url=' + encodeURIComponent(streamUrl);
+            
+            hls = new Hls({ 
+                maxBufferLength: 30, 
+                maxMaxBufferLength: 60, 
+                enableWorker: true,
+                debug: false,
+                manifestLoadingTimeOut: 10000,
+                manifestLoadingMaxRetry: 2,
+                levelLoadingTimeOut: 10000,
+                levelLoadingMaxRetry: 2,
+                fragLoadingTimeOut: 10000,
+                fragLoadingMaxRetry: 3
+            });
+            
+            // Loading progress
+            hls.on(Hls.Events.MANIFEST_LOADING, () => {
+                updateLoadingText('Manifest yükleniyor...');
+                updateBufferProgress(20);
+            });
+            
+            hls.on(Hls.Events.MANIFEST_LOADED, () => {
+                updateLoadingText('Yayın hazırlanıyor...');
+                updateBufferProgress(50);
+            });
+            
+            hls.on(Hls.Events.LEVEL_LOADED, () => {
+                updateLoadingText('Kalite seviyesi yükleniyor...');
+                updateBufferProgress(70);
+            });
+            
+            hls.on(Hls.Events.FRAG_LOADING, () => {
+                updateLoadingText('Video parçaları yükleniyor...');
+                updateBufferProgress(85);
+            });
+            
+            // Ready to play
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                updateBufferProgress(100);
+                updateLoadingText('Oynatılıyor...');
+                
+                video.play().then(() => {
+                    clearTimeout(loadingTimeout);
+                    hideVideoLoading();
+                }).catch(err => {
+                    console.error('Play error:', err);
+                    // Autoplay blocked, show loading but wait for user
+                    updateLoadingText('Oynatmak için dokunun');
+                });
+            });
+            
+            // Buffering events
+            hls.on(Hls.Events.BUFFER_APPENDING, () => {
+                showBuffering();
+            });
+            
+            hls.on(Hls.Events.BUFFER_APPENDED, () => {
+                hideBuffering();
+            });
+            
+            // Error handling
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                console.error('HLS Error:', data);
+                
+                if (data.fatal) {
+                    clearTimeout(loadingTimeout);
+                    
+                    switch(data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            if (retryCount < MAX_RETRIES) {
+                                retryCount++;
+                                updateLoadingText(`Bağlantı hatası, tekrar deneniyor (${retryCount}/${MAX_RETRIES})...`);
+                                hls.startLoad();
+                            } else {
+                                showVideoError('Ağ hatası', 'Yayın sunucusuna bağlanılamıyor. İnternet bağlantınızı kontrol edin.');
+                            }
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            updateLoadingText('Medya hatası, kurtarılıyor...');
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            showVideoError('Yayın hatası', 'Bilinmeyen bir hata oluştu: ' + data.details);
+                            break;
+                    }
+                }
+            });
+            
+            hls.loadSource(proxyUrl);
+            hls.attachMedia(video);
+        }
+        
+        function setupNativeHLS(video, streamUrl) {
+            updateLoadingText('Yayın yükleniyor...');
+            updateBufferProgress(30);
+            
+            video.src = streamUrl;
+            
+            video.addEventListener('loadedmetadata', () => {
+                updateBufferProgress(60);
+            });
+            
+            video.addEventListener('canplay', () => {
+                updateBufferProgress(100);
+                clearTimeout(loadingTimeout);
+                hideVideoLoading();
+            });
+            
+            video.addEventListener('waiting', () => {
+                showBuffering();
+            });
+            
+            video.addEventListener('playing', () => {
+                hideBuffering();
+                hideVideoLoading();
+            });
+            
+            video.addEventListener('error', (e) => {
+                clearTimeout(loadingTimeout);
+                const error = video.error;
+                let msg = 'Bilinmeyen hata';
+                if (error) {
+                    switch(error.code) {
+                        case 1: msg = 'Oynatma durduruldu'; break;
+                        case 2: msg = 'Ağ hatası'; break;
+                        case 3: msg = 'Kod çözme hatası'; break;
+                        case 4: msg = 'Format desteklenmiyor'; break;
+                    }
+                }
+                showVideoError('Oynatma hatası', msg);
+            });
+            
+            video.play().catch(err => {
+                if (err.name === 'NotAllowedError') {
+                    updateLoadingText('Oynatmak için dokunun');
+                }
+            });
+        }
+        
+        function setupDirectStream(video, streamUrl) {
+            updateLoadingText('Video yükleniyor...');
+            updateBufferProgress(30);
+            
+            video.src = streamUrl;
+            
+            video.addEventListener('canplay', () => {
+                clearTimeout(loadingTimeout);
+                hideVideoLoading();
+            });
+            
+            video.addEventListener('waiting', showBuffering);
+            video.addEventListener('playing', hideBuffering);
+            
+            video.addEventListener('error', () => {
+                clearTimeout(loadingTimeout);
+                showVideoError('Video yüklenemedi', 'Bu yayın formatı desteklenmiyor.');
+            });
+            
+            video.play().catch(() => {});
+        }
+        
+        // Video Loading UI
+        function showVideoLoading() {
+            document.getElementById('videoOverlay').classList.remove('hidden');
+            updateLoadingText('Yayın yükleniyor...');
+            updateBufferProgress(0);
+        }
+        
+        function hideVideoLoading() {
+            document.getElementById('videoOverlay').classList.add('hidden');
+        }
+        
+        function updateLoadingText(text) {
+            document.getElementById('loadingText').textContent = text;
+        }
+        
+        function updateBufferProgress(percent) {
+            document.getElementById('bufferProgress').style.width = percent + '%';
+        }
+        
+        function showBuffering() {
+            document.getElementById('bufferingIndicator').classList.add('visible');
+        }
+        
+        function hideBuffering() {
+            document.getElementById('bufferingIndicator').classList.remove('visible');
+        }
+        
+        function showVideoError(title, subtitle) {
+            hideVideoLoading();
+            hideBuffering();
+            document.getElementById('errorText').textContent = title || 'Yayın yüklenemedi';
+            document.getElementById('errorSubtext').textContent = subtitle || 'Bağlantı sorunu veya yayın kapalı olabilir';
+            document.getElementById('videoError').classList.add('visible');
+        }
+        
+        function hideVideoError() {
+            document.getElementById('videoError').classList.remove('visible');
+        }
+        
+        function retryChannel() {
+            if (currentChannelData) {
+                hideVideoError();
+                playChannel(currentChannelData.name);
+            }
+        }
+        
+        // ==========================================
+        // FAVORITES & FILTERS
+        // ==========================================
         
         function toggleCurrentFavorite() {
             if (!currentChannel) return;
@@ -281,18 +1559,37 @@
         
         function filterChannels(filter) {
             currentFilter = filter;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if ((filter === 'all' && btn.textContent.includes('Tümü')) ||
-                    (filter === 'favorites' && btn.textContent.includes('Favori')) ||
-                    (filter === 'recent' && btn.textContent.includes('Son'))) {
-                    btn.classList.add('active');
-                }
-            });
+            updateFilterButtons();
             renderChannels();
         }
         
+        function updateFilterButtons() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                const text = btn.textContent;
+                if ((currentFilter === 'all' && text.includes('Tümü')) ||
+                    (currentFilter === 'favorites' && text.includes('Favori')) ||
+                    (currentFilter === 'recent' && text.includes('Son'))) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
         function searchChannels() { renderChannels(); }
+        
+        // ==========================================
+        // EPG
+        // ==========================================
+        
+        async function loadEPG(url) {
+            try {
+                const response = await fetch('/epg?url=' + encodeURIComponent(url));
+                epgData = await response.json();
+                renderChannels();
+            } catch (e) {
+                console.error('EPG yüklenemedi:', e);
+            }
+        }
     </script>
 </body>
 </html>
