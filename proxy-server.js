@@ -103,8 +103,6 @@ function parseXMLTVDate(dateStr) {
 
 // Proxy request with redirect support
 function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
-    console.log(`[DEBUG] Proxy: ${targetUrl.substring(0, 100)} rewrite=${rewriteUrls} redirect=${redirectCount}`);
-    
     // Prevent infinite redirects
     if (redirectCount > 5) {
         res.statusCode = 508;
@@ -131,8 +129,6 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
     };
 
     const proxyReq = protocol.request(options, (proxyRes) => {
-        console.log(`[DEBUG] Response status: ${proxyRes.statusCode}, content-type: ${proxyRes.headers['content-type']}`);
-        
         // Handle redirects (301, 302, 307, 308)
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
             let redirectUrl = proxyRes.headers.location;
@@ -142,7 +138,7 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
                 redirectUrl = url.resolve(targetUrl, redirectUrl);
             }
             
-            console.log(`Redirect ${proxyRes.statusCode}: ${targetUrl} -> ${redirectUrl}`);
+            console.log(`Redirect ${proxyRes.statusCode}: ${targetUrl.substring(0, 80)}...`);
             
             // Follow redirect recursively
             proxyRequest(redirectUrl, res, rewriteUrls, redirectCount + 1);
@@ -160,24 +156,11 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
 
         if (rewriteUrls && contentType.includes('mpegurl')) {
             // Rewrite ALL HLS URLs (m3u8 and ts) through proxy for CORS
-            console.log(`[DEBUG] Rewriting manifest: ${targetUrl}, content-type: ${contentType}`);
             let body = '';
             proxyRes.setEncoding('utf8');
             proxyRes.on('data', chunk => body += chunk);
             proxyRes.on('end', () => {
-                try {
-                    const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
-                    console.log(`[DEBUG] Manifest body length: ${body.length}, baseUrl: ${baseUrl}`);
-                    
-                    // Show raw body first 500 chars
-                    console.log(`[DEBUG] Raw body preview:`, body.substring(0, 500));
-                    
-                    // Log all non-comment lines
-                    const allLines = body.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
-                    console.log(`[DEBUG] All URLs (${allLines.length}):`, allLines.slice(0, 10));
-                    
-                    let rewriteCount = 0;
-                    let rewriteCount = 0;
+                const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
                 const rewritten = body.replace(/^([^#\s].+)$/gm, (match) => {
                     // Skip if already a proxy URL or comment
                     if (match.startsWith('/stream-proxy') || match.startsWith('/proxy') || match.startsWith('#')) {
@@ -185,18 +168,9 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
                     }
                     // Make absolute URL if relative
                     const absoluteUrl = match.startsWith('http') ? match : baseUrl + match;
-                    const proxiedUrl = `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
-                    rewriteCount++;
-                    console.log(`[DEBUG] Rewrite #${rewriteCount}: ${match.substring(0, 50)}...`);
-                    return proxiedUrl;
+                    return `/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
                 });
-                console.log(`[DEBUG] Manifest rewritten (${rewriteCount} URLs), sending response`);
                 res.end(rewritten);
-                } catch (err) {
-                    console.error('[DEBUG] Error in manifest rewrite:', err);
-                    res.statusCode = 500;
-                    res.end(JSON.stringify({ error: 'Manifest rewrite failed' }));
-                }
             });
         } else {
             res.writeHead(proxyRes.statusCode);
@@ -205,7 +179,7 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
     });
 
     proxyReq.on('error', (err) => {
-        console.error('[DEBUG] Proxy error:', err.message, 'for URL:', targetUrl.substring(0, 80));
+        console.error('Proxy error:', err.message);
         res.statusCode = 500;
         res.end(JSON.stringify({ error: err.message }));
     });
