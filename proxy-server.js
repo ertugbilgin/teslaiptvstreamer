@@ -102,8 +102,15 @@ function parseXMLTVDate(dateStr) {
     return new Date(year, month, day, hour, minute);
 }
 
-// Proxy request
-function proxyRequest(targetUrl, res, rewriteUrls = false) {
+// Proxy request with redirect support
+function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
+    // Prevent infinite redirects
+    if (redirectCount > 5) {
+        res.statusCode = 508;
+        res.end(JSON.stringify({ error: 'Too many redirects' }));
+        return;
+    }
+
     const parsed = url.parse(targetUrl);
     const protocol = parsed.protocol === 'https:' ? https : http;
 
@@ -123,6 +130,22 @@ function proxyRequest(targetUrl, res, rewriteUrls = false) {
     };
 
     const proxyReq = protocol.request(options, (proxyRes) => {
+        // Handle redirects (301, 302, 307, 308)
+        if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+            let redirectUrl = proxyRes.headers.location;
+            
+            // Resolve relative URLs
+            if (!redirectUrl.startsWith('http')) {
+                redirectUrl = url.resolve(targetUrl, redirectUrl);
+            }
+            
+            console.log(`Redirect ${proxyRes.statusCode}: ${targetUrl} -> ${redirectUrl}`);
+            
+            // Follow redirect recursively
+            proxyRequest(redirectUrl, res, rewriteUrls, redirectCount + 1);
+            return;
+        }
+
         // CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
