@@ -12,6 +12,24 @@ const xml2js = require('xml2js');
 
 const PORT = process.env.PORT || 3000;
 
+// Connection agents for connection pooling (better performance for multiple clients)
+const httpAgent = new http.Agent({
+    keepAlive: true,
+    maxSockets: 100,
+    maxFreeSockets: 10,
+    timeout: 60000,
+    freeSocketTimeout: 30000
+});
+
+const httpsAgent = new https.Agent({
+    keepAlive: true,
+    maxSockets: 100,
+    maxFreeSockets: 10,
+    timeout: 60000,
+    freeSocketTimeout: 30000,
+    rejectUnauthorized: false
+});
+
 // MIME types
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -124,7 +142,8 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive'
         },
-        timeout: 10000,
+        agent: parsed.protocol === 'https:' ? httpsAgent : httpAgent,
+        timeout: 30000,
         rejectUnauthorized: false
     };
 
@@ -179,15 +198,20 @@ function proxyRequest(targetUrl, res, rewriteUrls = false, redirectCount = 0) {
     });
 
     proxyReq.on('error', (err) => {
-        console.error('Proxy error:', err.message);
-        res.statusCode = 500;
-        res.end(JSON.stringify({ error: err.message }));
+        console.error('Proxy error:', err.message, 'URL:', targetUrl.substring(0, 60));
+        if (!res.headersSent) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err.message }));
+        }
     });
 
     proxyReq.on('timeout', () => {
+        console.error('Proxy timeout:', targetUrl.substring(0, 60));
         proxyReq.destroy();
-        res.statusCode = 504;
-        res.end(JSON.stringify({ error: 'Gateway timeout' }));
+        if (!res.headersSent) {
+            res.statusCode = 504;
+            res.end(JSON.stringify({ error: 'Gateway timeout' }));
+        }
     });
 
     proxyReq.end();
@@ -332,4 +356,26 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚗 Tesla IPTV Server running on port ${PORT}`);
     console.log(`🌐 Domain: https://iptv.evmcp.shop`);
     console.log(`📡 Listening on 0.0.0.0:${PORT}`);
+    console.log(`👥 Max concurrent connections: ~${httpAgent.maxSockets + httpsAgent.maxSockets}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, closing server gracefully...');
+    server.close(() => {
+        httpAgent.destroy();
+        httpsAgent.destroy();
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received, closing server gracefully...');
+    server.close(() => {
+        httpAgent.destroy();
+        httpsAgent.destroy();
+        console.log('Server closed');
+        process.exit(0);
+    });
 });
