@@ -1564,6 +1564,9 @@
             currentChannelData = channel;
             retryCount = 0;
             
+            // Clear any previous errors immediately
+            hideVideoError();
+            
             // Show player UI
             document.getElementById('videoContainer').style.display = 'block';
             document.getElementById('playerHeader').style.display = 'flex';
@@ -1642,11 +1645,13 @@
             hls.on(Hls.Events.MANIFEST_LOADED, () => {
                 updateLoadingText(t('streamPreparing'));
                 updateBufferProgress(50);
+                hideVideoError(); // Clear previous errors
             });
             
             hls.on(Hls.Events.LEVEL_LOADED, () => {
                 updateLoadingText(t('qualityLoading'));
                 updateBufferProgress(70);
+                hideVideoError(); // Clear previous errors on level load
             });
             
             hls.on(Hls.Events.FRAG_LOADING, () => {
@@ -1658,6 +1663,7 @@
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 updateBufferProgress(100);
                 updateLoadingText(t('playing'));
+                hideVideoError(); // Clear any error messages
                 
                 video.play().then(() => {
                     clearTimeout(loadingTimeout);
