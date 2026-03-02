@@ -340,8 +340,9 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚗 Tesla IPTV Server running on port ${PORT}`);
     console.log(`🌐 Domain: https://iptv.evmcp.shop`);
+    console.log(`📡 Listening on 0.0.0.0:${PORT}`);
 });
 // Deploy timestamp: Mon Mar  2 12:09:49 CET 2026
